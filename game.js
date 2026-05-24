@@ -20,7 +20,9 @@ const game = {
     wave: 1,
     enemiesDefeated: 0,
     ammo: 30,
-    maxAmmo: 30
+    maxAmmo: 30,
+    aiming: false,
+    zoomLevel: 1
 };
 
 // Player camera (FPS view)
@@ -71,13 +73,21 @@ canvas.addEventListener('mousemove', (e) => {
     lastMouseX = mouseX;
 });
 
-canvas.addEventListener('click', (e) => {
-    shoot();
+// Clic gauche = tirer
+canvas.addEventListener('mousedown', (e) => {
+    if (e.button === 0) shoot();
 });
 
-canvas.addEventListener('click', (e) => {
-    shoot();
+// Clic droit = viser (ADS)
+canvas.addEventListener('mousedown', (e) => {
+    if (e.button === 2) game.aiming = true;
 });
+canvas.addEventListener('mouseup', (e) => {
+    if (e.button === 2) game.aiming = false;
+});
+
+// Désactiver le menu contextuel sur clic droit
+canvas.addEventListener('contextmenu', (e) => e.preventDefault());
 
 // Enemy class
 class Enemy {
@@ -302,9 +312,18 @@ function update() {
 }
 
 function draw() {
-    // Draw background image if loaded, otherwise fallback
+    // Zoom progressif quand on vise
+    const targetZoom = game.aiming ? 2.0 : 1.0;
+    game.zoomLevel += (targetZoom - game.zoomLevel) * 0.15;
+    const z = game.zoomLevel;
+
+    // Draw background avec zoom centré
     if (backgroundLoaded) {
-        ctx.drawImage(backgroundImage, 0, 0, canvas.width, canvas.height);
+        const sw = canvas.width / z;
+        const sh = canvas.height / z;
+        const sx = (backgroundImage.width - sw * (backgroundImage.width / canvas.width)) / 2;
+        const sy = (backgroundImage.height - sh * (backgroundImage.height / canvas.height)) / 2;
+        ctx.drawImage(backgroundImage, sx, sy, backgroundImage.width / z, backgroundImage.height / z, 0, 0, canvas.width, canvas.height);
     } else {
         // Fallback: Draw sky (gradient)
         const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height / 2);
@@ -345,36 +364,57 @@ function draw() {
     // Draw crosshair
     const cx = canvas.width / 2;
     const cy = canvas.height / 2;
-    const gap = 5;
-    const len = 18;
-    const thick = 2;
-
-    // Contour noir pour la lisibilité
-    ctx.strokeStyle = 'rgba(0,0,0,0.7)';
-    ctx.lineWidth = thick + 2;
     ctx.lineCap = 'round';
-    ctx.beginPath();
-    ctx.moveTo(cx - gap - len, cy); ctx.lineTo(cx - gap, cy);
-    ctx.moveTo(cx + gap, cy);       ctx.lineTo(cx + gap + len, cy);
-    ctx.moveTo(cx, cy - gap - len); ctx.lineTo(cx, cy - gap);
-    ctx.moveTo(cx, cy + gap);       ctx.lineTo(cx, cy + gap + len);
-    ctx.stroke();
 
-    // Croix blanche
-    ctx.strokeStyle = '#ffffff';
-    ctx.lineWidth = thick;
-    ctx.beginPath();
-    ctx.moveTo(cx - gap - len, cy); ctx.lineTo(cx - gap, cy);
-    ctx.moveTo(cx + gap, cy);       ctx.lineTo(cx + gap + len, cy);
-    ctx.moveTo(cx, cy - gap - len); ctx.lineTo(cx, cy - gap);
-    ctx.moveTo(cx, cy + gap);       ctx.lineTo(cx, cy + gap + len);
-    ctx.stroke();
+    if (game.aiming) {
+        // Mode visée : petit cercle rouge précis
+        ctx.strokeStyle = 'rgba(0,0,0,0.7)';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.arc(cx, cy, 14, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(cx - 20, cy); ctx.lineTo(cx + 20, cy);
+        ctx.moveTo(cx, cy - 20); ctx.lineTo(cx, cy + 20);
+        ctx.stroke();
 
-    // Point central
-    ctx.fillStyle = '#ffffff';
-    ctx.beginPath();
-    ctx.arc(cx, cy, 2, 0, Math.PI * 2);
-    ctx.fill();
+        ctx.strokeStyle = '#ff4444';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.arc(cx, cy, 14, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(cx - 20, cy); ctx.lineTo(cx + 20, cy);
+        ctx.moveTo(cx, cy - 20); ctx.lineTo(cx, cy + 20);
+        ctx.stroke();
+    } else {
+        // Mode normal : croix blanche avec gap
+        const gap = 5;
+        const len = 18;
+
+        ctx.strokeStyle = 'rgba(0,0,0,0.7)';
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.moveTo(cx - gap - len, cy); ctx.lineTo(cx - gap, cy);
+        ctx.moveTo(cx + gap, cy);       ctx.lineTo(cx + gap + len, cy);
+        ctx.moveTo(cx, cy - gap - len); ctx.lineTo(cx, cy - gap);
+        ctx.moveTo(cx, cy + gap);       ctx.lineTo(cx, cy + gap + len);
+        ctx.stroke();
+
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(cx - gap - len, cy); ctx.lineTo(cx - gap, cy);
+        ctx.moveTo(cx + gap, cy);       ctx.lineTo(cx + gap + len, cy);
+        ctx.moveTo(cx, cy - gap - len); ctx.lineTo(cx, cy - gap);
+        ctx.moveTo(cx, cy + gap);       ctx.lineTo(cx, cy + gap + len);
+        ctx.stroke();
+
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath();
+        ctx.arc(cx, cy, 2, 0, Math.PI * 2);
+        ctx.fill();
+    }
 }
 
 // Game loop
