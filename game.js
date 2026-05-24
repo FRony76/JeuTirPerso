@@ -49,6 +49,7 @@ let nextEnemyId = 0;
 
 // Input
 const keys = {};
+let lastMouseX = canvas.width / 2;
 
 // Event listeners
 window.addEventListener('keydown', (e) => {
@@ -63,13 +64,15 @@ window.addEventListener('keyup', (e) => {
 });
 
 canvas.addEventListener('mousemove', (e) => {
-    player.angle += e.movementX * 0.01;
+    const rect = canvas.getBoundingClientRect();
+    const mouseX = e.clientX - rect.left;
+    const delta = mouseX - lastMouseX;
+    player.angle += delta * 0.01;
+    lastMouseX = mouseX;
 });
 
 canvas.addEventListener('click', (e) => {
     shoot();
-    canvas.requestPointerLock = canvas.requestPointerLock || canvas.mozRequestPointerLock;
-    canvas.requestPointerLock();
 });
 
 canvas.addEventListener('click', (e) => {
