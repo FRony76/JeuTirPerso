@@ -4,6 +4,14 @@ const ctx = canvas.getContext('2d');
 canvas.width = 1024;
 canvas.height = 768;
 
+// Load background image
+const backgroundImage = new Image();
+backgroundImage.src = 'desert.jpg';
+let backgroundLoaded = false;
+backgroundImage.onload = () => {
+    backgroundLoaded = true;
+};
+
 // Game state
 const game = {
     score: 0,
@@ -291,24 +299,29 @@ function update() {
 }
 
 function draw() {
-    // Draw sky (gradient)
-    const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height / 2);
-    gradient.addColorStop(0, '#1a1a2e');
-    gradient.addColorStop(1, '#16213e');
-    ctx.fillStyle = gradient;
-    ctx.fillRect(0, 0, canvas.width, canvas.height / 2);
+    // Draw background image if loaded, otherwise fallback
+    if (backgroundLoaded) {
+        ctx.drawImage(backgroundImage, 0, 0, canvas.width, canvas.height);
+    } else {
+        // Fallback: Draw sky (gradient)
+        const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height / 2);
+        gradient.addColorStop(0, '#1a1a2e');
+        gradient.addColorStop(1, '#16213e');
+        ctx.fillStyle = gradient;
+        ctx.fillRect(0, 0, canvas.width, canvas.height / 2);
 
-    // Draw ground
-    ctx.fillStyle = '#0a0a0a';
-    ctx.fillRect(0, canvas.height / 2, canvas.width, canvas.height / 2);
+        // Draw ground
+        ctx.fillStyle = '#0a0a0a';
+        ctx.fillRect(0, canvas.height / 2, canvas.width, canvas.height / 2);
 
-    // Draw horizon line
-    ctx.strokeStyle = '#00ff00';
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(0, canvas.height / 2);
-    ctx.lineTo(canvas.width, canvas.height / 2);
-    ctx.stroke();
+        // Draw horizon line
+        ctx.strokeStyle = '#00ff00';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(0, canvas.height / 2);
+        ctx.lineTo(canvas.width, canvas.height / 2);
+        ctx.stroke();
+    }
 
     // Sort enemies by distance (painter's algorithm)
     enemies.sort((a, b) => b.distance - a.distance);
