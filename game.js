@@ -63,12 +63,13 @@ window.addEventListener('keyup', (e) => {
 });
 
 canvas.addEventListener('mousemove', (e) => {
-    const rect = canvas.getBoundingClientRect();
-    const mouseX = e.clientX - rect.left;
-    const centerX = canvas.width / 2;
-    const delta = mouseX - centerX;
-    player.angle += delta * 0.005;
-    // Recenter mouse logic would go here in a real game
+    player.angle += e.movementX * 0.01;
+});
+
+canvas.addEventListener('click', (e) => {
+    shoot();
+    canvas.requestPointerLock = canvas.requestPointerLock || canvas.mozRequestPointerLock;
+    canvas.requestPointerLock();
 });
 
 canvas.addEventListener('click', (e) => {
