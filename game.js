@@ -10,34 +10,44 @@ const game = {
     lives: 3,
     gameOver: false,
     wave: 1,
-    enemiesDefeated: 0
+    enemiesDefeated: 0,
+    ammo: 30,
+    maxAmmo: 30
 };
 
-// Player
+// Player camera (FPS view)
 const player = {
-    x: canvas.width / 2,
-    y: canvas.height / 2,
-    width: 20,
-    height: 30,
+    x: 512,
+    y: 384,
     angle: 0,
     speed: 3,
-    velocity: { x: 0, y: 0 },
-    hp: 3
+    fov: Math.PI / 3, // 60 degrees
+    viewDistance: 800
+};
+
+// Weapon state
+const weapon = {
+    recoil: 0,
+    recoilMax: 15,
+    fireRate: 0,
+    fireRateMax: 10,
+    bobbing: 0,
+    bobbingAmount: 0
 };
 
 // Arrays
-const bullets = [];
 const enemies = [];
-const explosions = [];
+let nextEnemyId = 0;
 
 // Input
 const keys = {};
-let mouseX = canvas.width / 2;
-let mouseY = canvas.height / 2;
 
 // Event listeners
 window.addEventListener('keydown', (e) => {
     keys[e.key.toUpperCase()] = true;
+    if (e.key === 'r' || e.key === 'R') {
+        reload();
+    }
 });
 
 window.addEventListener('keyup', (e) => {
@@ -46,282 +56,225 @@ window.addEventListener('keyup', (e) => {
 
 canvas.addEventListener('mousemove', (e) => {
     const rect = canvas.getBoundingClientRect();
-    mouseX = e.clientX - rect.left;
-    mouseY = e.clientY - rect.top;
+    const mouseX = e.clientX - rect.left;
+    const centerX = canvas.width / 2;
+    const delta = mouseX - centerX;
+    player.angle += delta * 0.005;
+    // Recenter mouse logic would go here in a real game
 });
 
 canvas.addEventListener('click', (e) => {
     shoot();
 });
 
-// Bullet class
-class Bullet {
-    constructor(x, y, angle) {
-        this.x = x;
-        this.y = y;
-        this.angle = angle;
-        this.speed = 7;
-        this.vx = Math.cos(angle) * this.speed;
-        this.vy = Math.sin(angle) * this.speed;
-        this.radius = 4;
-    }
-
-    update() {
-        this.x += this.vx;
-        this.y += this.vy;
-    }
-
-    draw() {
-        ctx.fillStyle = '#ffff00';
-        ctx.beginPath();
-        ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.strokeStyle = '#ffffff';
-        ctx.lineWidth = 1;
-        ctx.stroke();
-    }
-
-    isOutOfBounds() {
-        return this.x < 0 || this.x > canvas.width || this.y < 0 || this.y > canvas.height;
-    }
-}
-
 // Enemy class
 class Enemy {
     constructor(x, y) {
+        this.id = nextEnemyId++;
         this.x = x;
         this.y = y;
-        this.width = 25;
-        this.height = 25;
-        this.speed = 1.5;
-        this.hp = 1;
-        this.angle = Math.atan2(player.y - this.y, player.x - this.x);
+        this.width = 40;
+        this.height = 60;
+        this.speed = 1.2;
+        this.hp = 2;
+        this.distance = 0;
     }
 
     update() {
-        this.angle = Math.atan2(player.y - this.y, player.x - this.x);
-        this.x += Math.cos(this.angle) * this.speed;
-        this.y += Math.sin(this.angle) * this.speed;
+        const dx = player.x - this.x;
+        const dy = player.y - this.y;
+        this.distance = Math.sqrt(dx * dx + dy * dy);
+
+        // Move towards player
+        const angle = Math.atan2(dy, dx);
+        this.x += Math.cos(angle) * this.speed;
+        this.y += Math.sin(angle) * this.speed;
+
+        // Check if hit player
+        if (this.distance < 40) {
+            return 'hit';
+        }
+        return null;
     }
 
-    draw() {
-        ctx.save();
-        ctx.translate(this.x, this.y);
-        ctx.rotate(this.angle);
-
-        // Enemy body
-        ctx.fillStyle = '#ff0000';
-        ctx.fillRect(-this.width / 2, -this.height / 2, this.width, this.height);
-
-        // Enemy eye
-        ctx.fillStyle = '#ffff00';
-        ctx.beginPath();
-        ctx.arc(5, 0, 4, 0, Math.PI * 2);
-        ctx.fill();
-
-        ctx.restore();
-    }
-
-    isColliding(bullet) {
-        return (
-            bullet.x > this.x - this.width / 2 &&
-            bullet.x < this.x + this.width / 2 &&
-            bullet.y > this.y - this.height / 2 &&
-            bullet.y < this.y + this.height / 2
-        );
-    }
-
-    distanceToPlayer() {
+    isHitByRaycast(angle, maxDist) {
         const dx = this.x - player.x;
         const dy = this.y - player.y;
-        return Math.sqrt(dx * dx + dy * dy);
+        const dist = Math.sqrt(dx * dx + dy * dy);
+
+        if (dist > maxDist) return false;
+
+        const angleTo = Math.atan2(dy, dx);
+        const angleDiff = Math.abs(angleTo - angle);
+
+        // Check if enemy is roughly in the direction of the ray
+        return angleDiff < 0.3 && dist < maxDist;
+    }
+
+    drawFirstPerson(screenX, screenWidth, distanceToCenter) {
+        if (this.distance > player.viewDistance) return;
+
+        // Calculate size based on distance
+        const relativeDistance = this.distance / player.viewDistance;
+        const scale = (1 - relativeDistance * 0.7);
+        const size = this.height * scale * 100;
+
+        const screenY = canvas.height / 2 - size / 2;
+        const screenWidth_ = size * 0.6;
+
+        // Color based on distance (darker = farther)
+        const colorIntensity = Math.max(0.3, 1 - relativeDistance);
+        const r = Math.floor(255 * colorIntensity);
+        const g = 0;
+        const b = 0;
+
+        // Draw enemy body
+        ctx.fillStyle = `rgb(${r}, ${g}, ${b})`;
+        ctx.fillRect(screenX, screenY, screenWidth_, size);
+
+        // Draw eyes
+        const eyeSize = size * 0.1;
+        ctx.fillStyle = '#ffff00';
+        ctx.fillRect(screenX + screenWidth_ * 0.3, screenY + size * 0.3, eyeSize, eyeSize);
+        ctx.fillRect(screenX + screenWidth_ * 0.6, screenY + size * 0.3, eyeSize, eyeSize);
+
+        // Draw outline
+        ctx.strokeStyle = `rgb(${r}, 100, 0)`;
+        ctx.lineWidth = 2;
+        ctx.strokeRect(screenX, screenY, screenWidth_, size);
     }
 }
 
-// Explosion class
-class Explosion {
-    constructor(x, y) {
-        this.x = x;
-        this.y = y;
-        this.particles = [];
-        for (let i = 0; i < 8; i++) {
-            this.particles.push({
-                x: x,
-                y: y,
-                vx: (Math.random() - 0.5) * 4,
-                vy: (Math.random() - 0.5) * 4,
-                life: 30
-            });
+function shoot() {
+    if (game.gameOver || game.ammo <= 0) return;
+    if (weapon.fireRate > 0) return;
+
+    game.ammo--;
+    weapon.fireRate = weapon.fireRateMax;
+    weapon.recoil = weapon.recoilMax;
+
+    // Raycast to detect enemies
+    for (let i = enemies.length - 1; i >= 0; i--) {
+        const enemy = enemies[i];
+        if (enemy.isHitByRaycast(player.angle, 300)) {
+            enemy.hp--;
+            if (enemy.hp <= 0) {
+                enemies.splice(i, 1);
+                game.score += 100;
+                game.enemiesDefeated++;
+
+                // Next wave
+                if (game.enemiesDefeated % 5 === 0) {
+                    game.wave++;
+                    spawnEnemies();
+                }
+            }
+            break;
         }
     }
-
-    update() {
-        this.particles.forEach(p => {
-            p.x += p.vx;
-            p.y += p.vy;
-            p.life--;
-            p.vy += 0.1;
-        });
-    }
-
-    draw() {
-        this.particles.forEach(p => {
-            if (p.life > 0) {
-                ctx.fillStyle = `rgba(255, ${Math.max(0, 100 * (p.life / 30))}, 0, ${p.life / 30})`;
-                ctx.beginPath();
-                ctx.arc(p.x, p.y, 3, 0, Math.PI * 2);
-                ctx.fill();
-            }
-        });
-    }
-
-    isDone() {
-        return this.particles.every(p => p.life <= 0);
-    }
 }
 
-// Functions
-function shoot() {
-    if (!game.gameOver) {
-        const bulletAngle = Math.atan2(mouseY - player.y, mouseX - player.x);
-        bullets.push(new Bullet(player.x, player.y, bulletAngle));
-    }
+function reload() {
+    game.ammo = game.maxAmmo;
 }
 
 function spawnEnemies() {
-    const enemyCount = 3 + game.wave;
+    const enemyCount = 2 + game.wave;
     for (let i = 0; i < enemyCount; i++) {
         let x, y;
-        const side = Math.floor(Math.random() * 4);
+        const angle = Math.random() * Math.PI * 2;
+        const distance = 300 + Math.random() * 200;
 
-        switch(side) {
-            case 0: // top
-                x = Math.random() * canvas.width;
-                y = -30;
-                break;
-            case 1: // right
-                x = canvas.width + 30;
-                y = Math.random() * canvas.height;
-                break;
-            case 2: // bottom
-                x = Math.random() * canvas.width;
-                y = canvas.height + 30;
-                break;
-            case 3: // left
-                x = -30;
-                y = Math.random() * canvas.height;
-                break;
-        }
+        x = player.x + Math.cos(angle) * distance;
+        y = player.y + Math.sin(angle) * distance;
 
         enemies.push(new Enemy(x, y));
     }
 }
 
 function updatePlayer() {
-    player.velocity.x = 0;
-    player.velocity.y = 0;
+    let moveX = 0;
+    let moveY = 0;
 
     if (keys['W']) {
-        player.velocity.x = Math.cos(player.angle) * player.speed;
-        player.velocity.y = Math.sin(player.angle) * player.speed;
+        moveX = Math.cos(player.angle) * player.speed;
+        moveY = Math.sin(player.angle) * player.speed;
+        weapon.bobbingAmount = 1;
     }
     if (keys['S']) {
-        player.velocity.x = Math.cos(player.angle) * -player.speed;
-        player.velocity.y = Math.sin(player.angle) * -player.speed;
+        moveX = Math.cos(player.angle) * -player.speed;
+        moveY = Math.sin(player.angle) * -player.speed;
+        weapon.bobbingAmount = 0.5;
     }
 
-    player.x += player.velocity.x;
-    player.y += player.velocity.y;
+    player.x += moveX;
+    player.y += moveY;
 
-    // Update angle to face mouse
-    player.angle = Math.atan2(mouseY - player.y, mouseX - player.x);
+    // Update weapon state
+    if (weapon.fireRate > 0) weapon.fireRate--;
+    if (weapon.recoil > 0) weapon.recoil -= 0.5;
 
-    // Boundaries
-    player.x = Math.max(player.width / 2, Math.min(canvas.width - player.width / 2, player.x));
-    player.y = Math.max(player.height / 2, Math.min(canvas.height - player.height / 2, player.y));
+    // Weapon bobbing
+    weapon.bobbing += weapon.bobbingAmount * 0.05;
+    weapon.bobbingAmount *= 0.95;
 }
 
-function drawPlayer() {
-    ctx.save();
-    ctx.translate(player.x, player.y);
-    ctx.rotate(player.angle);
-
-    // Player body
-    ctx.fillStyle = '#00ff00';
-    ctx.fillRect(-player.width / 2, -player.height / 2, player.width, player.height);
+function drawWeapon() {
+    const gunX = canvas.width - 150 + weapon.recoil * 5;
+    const gunY = canvas.height - 150 + Math.sin(weapon.bobbing) * 10;
 
     // Gun barrel
-    ctx.strokeStyle = '#00ff00';
-    ctx.lineWidth = 3;
+    ctx.strokeStyle = '#666666';
+    ctx.lineWidth = 8;
     ctx.beginPath();
-    ctx.moveTo(0, 0);
-    ctx.lineTo(15, 0);
+    ctx.moveTo(gunX + 50, gunY - 20);
+    ctx.lineTo(gunX + 120, gunY - 30);
     ctx.stroke();
 
-    ctx.restore();
+    // Gun grip
+    ctx.fillStyle = '#444444';
+    ctx.fillRect(gunX + 40, gunY, 40, 80);
+
+    // Gun slide
+    ctx.fillStyle = '#555555';
+    ctx.fillRect(gunX + 50, gunY - 25, 60, 15);
+
+    // Sights
+    ctx.strokeStyle = '#00ff00';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(gunX + 60, gunY - 35);
+    ctx.lineTo(gunX + 60, gunY - 50);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(gunX + 110, gunY - 40);
+    ctx.lineTo(gunX + 110, gunY - 50);
+    ctx.stroke();
+
+    // Muzzle flash
+    if (weapon.fireRate > weapon.fireRateMax - 5) {
+        ctx.fillStyle = 'rgba(255, 150, 0, 0.7)';
+        ctx.fillRect(gunX + 115, gunY - 30, 30, 20);
+    }
 }
 
 function update() {
     if (game.gameOver) return;
 
-    // Update player
     updatePlayer();
-
-    // Update bullets
-    for (let i = bullets.length - 1; i >= 0; i--) {
-        bullets[i].update();
-
-        if (bullets[i].isOutOfBounds()) {
-            bullets.splice(i, 1);
-            continue;
-        }
-
-        // Collision detection
-        for (let j = enemies.length - 1; j >= 0; j--) {
-            if (enemies[j].isColliding(bullets[i])) {
-                enemies[j].hp--;
-                if (enemies[j].hp <= 0) {
-                    explosions.push(new Explosion(enemies[j].x, enemies[j].y));
-                    enemies.splice(j, 1);
-                    game.score += 100;
-                    game.enemiesDefeated++;
-
-                    // Next wave
-                    if (game.enemiesDefeated % 5 === 0) {
-                        game.wave++;
-                        spawnEnemies();
-                    }
-                }
-                bullets.splice(i, 1);
-                break;
-            }
-        }
-    }
 
     // Update enemies
     for (let i = enemies.length - 1; i >= 0; i--) {
-        const enemy = enemies[i];
-        enemy.update();
-
-        // Collision with player
-        if (enemy.distanceToPlayer() < 30) {
+        const result = enemies[i].update();
+        if (result === 'hit') {
             game.lives--;
-            explosions.push(new Explosion(player.x, player.y));
             enemies.splice(i, 1);
 
             if (game.lives <= 0) {
                 game.gameOver = true;
                 document.getElementById('gameOver').style.display = 'block';
-                document.getElementById('finalScore').textContent = `Score: ${game.score}`;
+                document.getElementById('finalScore').textContent = `Score: ${game.score} | Vague: ${game.wave}`;
             }
-        }
-    }
-
-    // Update explosions
-    explosions.forEach(exp => exp.update());
-    for (let i = explosions.length - 1; i >= 0; i--) {
-        if (explosions[i].isDone()) {
-            explosions.splice(i, 1);
         }
     }
 
@@ -333,47 +286,61 @@ function update() {
     // Update UI
     document.getElementById('score').textContent = `Score: ${game.score}`;
     document.getElementById('lives').textContent = `Vies: ${game.lives}`;
+    document.getElementById('ammo').textContent = `Munitions: ${game.ammo}/${game.maxAmmo}`;
+    document.getElementById('wave').textContent = `Vague: ${game.wave}`;
 }
 
 function draw() {
-    // Clear canvas
+    // Draw sky (gradient)
+    const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height / 2);
+    gradient.addColorStop(0, '#1a1a2e');
+    gradient.addColorStop(1, '#16213e');
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, canvas.width, canvas.height / 2);
+
+    // Draw ground
     ctx.fillStyle = '#0a0a0a';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillRect(0, canvas.height / 2, canvas.width, canvas.height / 2);
 
-    // Draw grid
-    ctx.strokeStyle = 'rgba(0, 255, 0, 0.1)';
+    // Draw horizon line
+    ctx.strokeStyle = '#00ff00';
     ctx.lineWidth = 1;
-    for (let i = 0; i < canvas.width; i += 50) {
-        ctx.beginPath();
-        ctx.moveTo(i, 0);
-        ctx.lineTo(i, canvas.height);
-        ctx.stroke();
-    }
-    for (let i = 0; i < canvas.height; i += 50) {
-        ctx.beginPath();
-        ctx.moveTo(0, i);
-        ctx.lineTo(canvas.width, i);
-        ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(0, canvas.height / 2);
+    ctx.lineTo(canvas.width, canvas.height / 2);
+    ctx.stroke();
+
+    // Sort enemies by distance (painter's algorithm)
+    enemies.sort((a, b) => b.distance - a.distance);
+
+    // Draw enemies
+    const centerX = canvas.width / 2;
+    for (let i = 0; i < enemies.length; i++) {
+        const enemy = enemies[i];
+        const angleDiff = player.angle - Math.atan2(enemy.y - player.y, enemy.x - player.x);
+        const screenX = centerX + Math.sin(angleDiff) * 200;
+
+        enemy.drawFirstPerson(screenX, 100, angleDiff);
     }
 
-    // Draw everything
-    drawPlayer();
-
-    bullets.forEach(bullet => bullet.draw());
-    enemies.forEach(enemy => enemy.draw());
-    explosions.forEach(exp => exp.draw());
+    // Draw weapon
+    drawWeapon();
 
     // Draw crosshair
     ctx.strokeStyle = '#00ff00';
     ctx.lineWidth = 2;
     ctx.beginPath();
-    ctx.arc(mouseX, mouseY, 10, 0, Math.PI * 2);
+    ctx.arc(canvas.width / 2, canvas.height / 2, 8, 0, Math.PI * 2);
     ctx.stroke();
+
     ctx.beginPath();
-    ctx.moveTo(mouseX - 15, mouseY);
-    ctx.lineTo(mouseX + 15, mouseY);
-    ctx.moveTo(mouseX, mouseY - 15);
-    ctx.lineTo(mouseX, mouseY + 15);
+    ctx.moveTo(canvas.width / 2 - 15, canvas.height / 2);
+    ctx.lineTo(canvas.width / 2 + 15, canvas.height / 2);
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.moveTo(canvas.width / 2, canvas.height / 2 - 15);
+    ctx.lineTo(canvas.width / 2, canvas.height / 2 + 15);
     ctx.stroke();
 }
 
