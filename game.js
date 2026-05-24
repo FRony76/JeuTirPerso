@@ -51,6 +51,7 @@ const weapon = {
 
 // Arrays
 const enemies = [];
+const projectiles = []; // balles visuelles tirées
 let nextEnemyId = 0;
 
 // Input
@@ -153,19 +154,19 @@ class Enemy {
         const g = 0;
         const b = 0;
 
-        // Draw enemy as billiard ball image (or fallback red square)
-        const drawSize = Math.max(size * 0.6, 20);
-        const ballX = screenX - drawSize / 2;
-        const ballY = canvas.height / 2 - drawSize / 2;
+        // Draw enemy as red square
+        ctx.fillStyle = `rgb(${r}, ${g}, ${b})`;
+        ctx.fillRect(screenX, screenY, screenWidth_, size);
 
-        if (enemyImageLoaded) {
-            ctx.globalAlpha = Math.max(0.4, colorIntensity);
-            ctx.drawImage(enemyImage, ballX, ballY, drawSize, drawSize);
-            ctx.globalAlpha = 1.0;
-        } else {
-            ctx.fillStyle = `rgb(${r}, ${g}, ${b})`;
-            ctx.fillRect(ballX, ballY, drawSize, drawSize);
-        }
+        // Eyes
+        const eyeSize = size * 0.1;
+        ctx.fillStyle = '#ffff00';
+        ctx.fillRect(screenX + screenWidth_ * 0.3, screenY + size * 0.3, eyeSize, eyeSize);
+        ctx.fillRect(screenX + screenWidth_ * 0.6, screenY + size * 0.3, eyeSize, eyeSize);
+
+        ctx.strokeStyle = `rgb(${r}, 100, 0)`;
+        ctx.lineWidth = 2;
+        ctx.strokeRect(screenX, screenY, screenWidth_, size);
     }
 }
 
@@ -176,6 +177,18 @@ function shoot() {
     game.ammo--;
     weapon.fireRate = weapon.fireRateMax;
     weapon.recoil = weapon.recoilMax;
+
+    // Ajouter un projectile visuel (balle de billard)
+    const gunX = canvas.width - 150 + weapon.recoil * 5;
+    const gunY = canvas.height - 120;
+    projectiles.push({
+        x: gunX + 60,
+        y: gunY,
+        targetX: canvas.width / 2,
+        targetY: canvas.height / 2,
+        size: 40,
+        life: 1.0  // 1.0 = neuf, diminue jusqu'à 0
+    });
 
     // Raycast to detect enemies
     for (let i = enemies.length - 1; i >= 0; i--) {
@@ -359,6 +372,29 @@ function draw() {
         const screenX = centerX + Math.sin(angleDiff) * 200;
 
         enemy.drawFirstPerson(screenX, 100, angleDiff);
+    }
+
+    // Draw et update projectiles (balles de billard)
+    for (let i = projectiles.length - 1; i >= 0; i--) {
+        const p = projectiles[i];
+        p.life -= 0.06;
+        if (p.life <= 0) { projectiles.splice(i, 1); continue; }
+
+        // Interpolation vers le viseur
+        p.x += (p.targetX - p.x) * 0.18;
+        p.y += (p.targetY - p.y) * 0.18;
+
+        const s = p.size * p.life;
+        ctx.globalAlpha = p.life;
+        if (enemyImageLoaded) {
+            ctx.drawImage(enemyImage, p.x - s / 2, p.y - s / 2, s, s);
+        } else {
+            ctx.fillStyle = '#222277';
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, s / 2, 0, Math.PI * 2);
+            ctx.fill();
+        }
+        ctx.globalAlpha = 1.0;
     }
 
     // Draw weapon
