@@ -134,7 +134,7 @@ class Enemy {
         const screenWidth_ = size * 0.6;
 
         // Color based on distance (darker = farther)
-        const colorIntensity = Math.max(0.3, 1 - relativeDistance);
+        const colorIntensity = Math.max(0.3, 1 - this.distance / player.viewDistance);
         const r = Math.floor(255 * colorIntensity);
         const g = 0;
         const b = 0;
@@ -343,21 +343,38 @@ function draw() {
     drawWeapon();
 
     // Draw crosshair
-    ctx.strokeStyle = '#00ff00';
-    ctx.lineWidth = 2;
+    const cx = canvas.width / 2;
+    const cy = canvas.height / 2;
+    const gap = 5;
+    const len = 18;
+    const thick = 2;
+
+    // Contour noir pour la lisibilité
+    ctx.strokeStyle = 'rgba(0,0,0,0.7)';
+    ctx.lineWidth = thick + 2;
+    ctx.lineCap = 'round';
     ctx.beginPath();
-    ctx.arc(canvas.width / 2, canvas.height / 2, 8, 0, Math.PI * 2);
+    ctx.moveTo(cx - gap - len, cy); ctx.lineTo(cx - gap, cy);
+    ctx.moveTo(cx + gap, cy);       ctx.lineTo(cx + gap + len, cy);
+    ctx.moveTo(cx, cy - gap - len); ctx.lineTo(cx, cy - gap);
+    ctx.moveTo(cx, cy + gap);       ctx.lineTo(cx, cy + gap + len);
     ctx.stroke();
 
+    // Croix blanche
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = thick;
     ctx.beginPath();
-    ctx.moveTo(canvas.width / 2 - 15, canvas.height / 2);
-    ctx.lineTo(canvas.width / 2 + 15, canvas.height / 2);
+    ctx.moveTo(cx - gap - len, cy); ctx.lineTo(cx - gap, cy);
+    ctx.moveTo(cx + gap, cy);       ctx.lineTo(cx + gap + len, cy);
+    ctx.moveTo(cx, cy - gap - len); ctx.lineTo(cx, cy - gap);
+    ctx.moveTo(cx, cy + gap);       ctx.lineTo(cx, cy + gap + len);
     ctx.stroke();
 
+    // Point central
+    ctx.fillStyle = '#ffffff';
     ctx.beginPath();
-    ctx.moveTo(canvas.width / 2, canvas.height / 2 - 15);
-    ctx.lineTo(canvas.width / 2, canvas.height / 2 + 15);
-    ctx.stroke();
+    ctx.arc(cx, cy, 2, 0, Math.PI * 2);
+    ctx.fill();
 }
 
 // Game loop
