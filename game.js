@@ -103,7 +103,7 @@ class Enemy {
         this.width = 40;
         this.height = 60;
         this.speed = 1.2;
-        this.hp = 2;
+        this.hp = 1;
         this.distance = 0;
     }
 
@@ -132,10 +132,13 @@ class Enemy {
         if (dist > maxDist) return false;
 
         const angleTo = Math.atan2(dy, dx);
-        const angleDiff = Math.abs(angleTo - angle);
 
-        // Check if enemy is roughly in the direction of the ray
-        return angleDiff < 0.3 && dist < maxDist;
+        // Normaliser la différence d'angle entre -PI et PI
+        let angleDiff = angleTo - angle;
+        while (angleDiff > Math.PI)  angleDiff -= 2 * Math.PI;
+        while (angleDiff < -Math.PI) angleDiff += 2 * Math.PI;
+
+        return Math.abs(angleDiff) < 0.2;
     }
 
     drawFirstPerson(screenX, screenWidth, distanceToCenter) {
@@ -193,7 +196,7 @@ function shoot() {
     // Raycast to detect enemies
     for (let i = enemies.length - 1; i >= 0; i--) {
         const enemy = enemies[i];
-        if (enemy.isHitByRaycast(player.angle, 300)) {
+        if (enemy.isHitByRaycast(player.angle, player.viewDistance)) {
             enemy.hp--;
             if (enemy.hp <= 0) {
                 enemies.splice(i, 1);
