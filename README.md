@@ -1,24 +1,27 @@
 # JeuTirPerso
 
-Jeu de tir arcade basé sur les designs de votre cahier de notes !
+FPS première personne basé sur les designs de votre cahier de notes ! 🎮
 
 ## 🎮 Gameplay
 
-Un jeu de tir arcade où vous affrontez des vagues d'ennemis croissantes. Survivez le plus longtemps possible et obtenez le meilleur score !
+Un jeu de tir en **vue subjective** où vous n'êtes rien qu'une arme ! Affrontez des vagues d'ennemis croissantes en vue première personne. Seule votre arme est visible à l'écran.
 
 ### Contrôles
 
 - **W** : Avancer
 - **S** : Reculer  
-- **Souris** : Viser
+- **Souris** : Regarder autour (rotation de caméra)
 - **Clic gauche** : Tirer
+- **R** : Recharger
 
 ### Mécaniques
 
 - Éliminez les ennemis pour gagner des points (+100 points par ennemi)
+- Système de munitions limité (30 balles par chargeur)
 - Évitez les contacts avec les ennemis (vous avez 3 vies)
+- Les ennemis apparaissent autour de vous et avancent
 - Chaque 5 ennemis tués = nouvelle vague plus difficile
-- Les ennemis deviennent plus nombreux à chaque vague
+- Les ennemis deviennent plus nombreux et rouges = plus proche
 
 ## 🚀 Installation
 
@@ -44,12 +47,14 @@ Un jeu de tir arcade où vous affrontez des vagues d'ennemis croissantes. Surviv
 
 ## 🎨 Features
 
-- Rendu canvas avec grille de fond
-- Système de collision joueur/ennemi/balles
-- Explosions avec particules
-- UI avec score et vies
-- Crosshair dynamique
-- Vagues d'ennemis progressives
+- **Vue première personne** (FPS subjectif)
+- **Arme visible** à l'écran (pistolet avec animation de recul)
+- Ennemis qui se rapprochent dynamiquement
+- Système de munitions avec recharge (R)
+- Crosshair vert au centre
+- Bobbing de l'arme lors du mouvement
+- Vagues d'ennemis croissantes
+- Horizon avec ciel en dégradé et sol noir
 
 ## 🛠️ Technologie
 
