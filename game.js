@@ -8,9 +8,13 @@ canvas.height = 768;
 const backgroundImage = new Image();
 backgroundImage.src = 'desert.jpg';
 let backgroundLoaded = false;
-backgroundImage.onload = () => {
-    backgroundLoaded = true;
-};
+backgroundImage.onload = () => { backgroundLoaded = true; };
+
+// Load enemy (billiard ball) image
+const enemyImage = new Image();
+enemyImage.src = 'billiard.webp';
+let enemyImageLoaded = false;
+enemyImage.onload = () => { enemyImageLoaded = true; };
 
 // Game state
 const game = {
@@ -149,20 +153,19 @@ class Enemy {
         const g = 0;
         const b = 0;
 
-        // Draw enemy body
-        ctx.fillStyle = `rgb(${r}, ${g}, ${b})`;
-        ctx.fillRect(screenX, screenY, screenWidth_, size);
+        // Draw enemy as billiard ball image (or fallback red square)
+        const drawSize = Math.max(size * 0.6, 20);
+        const ballX = screenX - drawSize / 2;
+        const ballY = canvas.height / 2 - drawSize / 2;
 
-        // Draw eyes
-        const eyeSize = size * 0.1;
-        ctx.fillStyle = '#ffff00';
-        ctx.fillRect(screenX + screenWidth_ * 0.3, screenY + size * 0.3, eyeSize, eyeSize);
-        ctx.fillRect(screenX + screenWidth_ * 0.6, screenY + size * 0.3, eyeSize, eyeSize);
-
-        // Draw outline
-        ctx.strokeStyle = `rgb(${r}, 100, 0)`;
-        ctx.lineWidth = 2;
-        ctx.strokeRect(screenX, screenY, screenWidth_, size);
+        if (enemyImageLoaded) {
+            ctx.globalAlpha = Math.max(0.4, colorIntensity);
+            ctx.drawImage(enemyImage, ballX, ballY, drawSize, drawSize);
+            ctx.globalAlpha = 1.0;
+        } else {
+            ctx.fillStyle = `rgb(${r}, ${g}, ${b})`;
+            ctx.fillRect(ballX, ballY, drawSize, drawSize);
+        }
     }
 }
 
