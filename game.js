@@ -193,10 +193,14 @@ function shoot() {
         life: 1.0  // 1.0 = neuf, diminue jusqu'à 0
     });
 
-    // Raycast to detect enemies
+    // Détection : l'ennemi est-il affiché près du viseur (centre écran) ?
+    const centerX = canvas.width / 2;
     for (let i = enemies.length - 1; i >= 0; i--) {
         const enemy = enemies[i];
-        if (enemy.isHitByRaycast(player.angle, player.viewDistance)) {
+        const angleDiff = player.angle - Math.atan2(enemy.y - player.y, enemy.x - player.x);
+        const screenX = centerX + Math.sin(angleDiff) * 200;
+        const onScreen = Math.abs(screenX - centerX) < 50 && enemy.distance < player.viewDistance;
+        if (onScreen) {
             enemy.hp--;
             if (enemy.hp <= 0) {
                 enemies.splice(i, 1);
