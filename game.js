@@ -126,10 +126,9 @@ class Enemy {
     drawFirstPerson(screenX, screenWidth, distanceToCenter) {
         if (this.distance > player.viewDistance) return;
 
-        // Calculate size based on distance
-        const relativeDistance = this.distance / player.viewDistance;
-        const scale = (1 - relativeDistance * 0.7);
-        const size = this.height * scale * 100;
+        // Calculate size based on distance (smaller = farther)
+        const scale = 100 / this.distance;
+        const size = Math.max(20, Math.min(300, this.height * scale));
 
         const screenY = canvas.height / 2 - size / 2;
         const screenWidth_ = size * 0.6;
@@ -195,7 +194,7 @@ function spawnEnemies() {
     for (let i = 0; i < enemyCount; i++) {
         let x, y;
         const angle = Math.random() * Math.PI * 2;
-        const distance = 300 + Math.random() * 200;
+        const distance = 600 + Math.random() * 300;
 
         x = player.x + Math.cos(angle) * distance;
         y = player.y + Math.sin(angle) * distance;
