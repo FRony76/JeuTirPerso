@@ -1,7 +1,14 @@
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
-canvas.width = 1024;
-canvas.height = 768;
+
+canvas.width  = window.innerWidth;
+canvas.height = window.innerHeight;
+
+window.addEventListener('resize', () => {
+    canvas.width  = window.innerWidth;
+    canvas.height = window.innerHeight;
+    zBuffer = new Array(canvas.width).fill(Infinity);
+});
 
 // ─── MAP ─────────────────────────────────────────────────────────────────────
 const TILE_SIZE = 64;

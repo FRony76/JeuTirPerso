@@ -12,28 +12,24 @@
         }
 
         body {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-            background: #1a1a1a;
+            background: #000;
             font-family: Arial, sans-serif;
             overflow: hidden;
+            width: 100vw;
+            height: 100vh;
         }
 
         #gameContainer {
-            position: relative;
-            width: 1024px;
-            height: 768px;
-            border: 3px solid #00ff00;
+            position: fixed;
+            inset: 0;
             background: #0a0a0a;
-            box-shadow: 0 0 20px rgba(0, 255, 0, 0.3);
         }
 
         canvas {
             display: block;
             width: 100%;
             height: 100%;
+            cursor: none;
         }
 
         #ui {
@@ -125,6 +121,6 @@
         </div>
     </div>
 
-    <script src="game.js?v=4"></script>
+    <script src="game.js?v=5"></script>
 </body>
 </html>
