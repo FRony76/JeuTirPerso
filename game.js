@@ -1,114 +1,113 @@
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
-
 canvas.width = 1024;
 canvas.height = 768;
 
-// Load background image
-const backgroundImage = new Image();
-backgroundImage.src = 'desert.jpg';
-let backgroundLoaded = false;
-backgroundImage.onload = () => { backgroundLoaded = true; };
+// ─── MAP ─────────────────────────────────────────────────────────────────────
+const TILE_SIZE = 64;
+const MAP = [
+  [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+  [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+  [1,0,1,1,0,1,1,0,0,1,1,0,1,1,0,1],
+  [1,0,1,0,0,0,0,0,0,0,0,0,0,1,0,1],
+  [1,0,0,0,1,0,1,1,1,1,0,1,0,0,0,1],
+  [1,0,1,0,1,0,1,0,0,1,0,1,0,1,0,1],
+  [1,0,1,0,0,0,0,0,0,0,0,0,0,1,0,1],
+  [1,0,0,0,1,0,1,0,0,1,0,1,0,0,0,1],
+  [1,0,1,0,1,0,1,1,1,1,0,1,0,1,0,1],
+  [1,0,1,0,0,0,0,0,0,0,0,0,0,1,0,1],
+  [1,0,0,1,1,0,1,1,0,1,1,0,1,1,0,1],
+  [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+];
+const MAP_W = MAP[0].length;
+const MAP_H = MAP.length;
 
-// Load enemy (billiard ball) image
+// ─── IMAGES ──────────────────────────────────────────────────────────────────
 const enemyImage = new Image();
 enemyImage.src = 'billiard.webp';
 let enemyImageLoaded = false;
 enemyImage.onload = () => { enemyImageLoaded = true; };
 
-// Load weapon image
 const weaponImage = new Image();
 weaponImage.src = 'arme1.avif';
 let weaponImageLoaded = false;
 weaponImage.onload = () => { weaponImageLoaded = true; };
 
-// Game state
+// ─── GAME STATE ──────────────────────────────────────────────────────────────
 const game = {
-    score: 0,
-    lives: 3,
-    gameOver: false,
-    wave: 1,
-    enemiesDefeated: 0,
-    ammo: 30,
-    maxAmmo: 30,
+    score: 0, lives: 3, gameOver: false,
+    wave: 1, enemiesDefeated: 0,
+    ammo: 30, maxAmmo: 30,
     aiming: false,
-    zoomLevel: 1
+    baseFOV: Math.PI / 3,
 };
 
-// Player camera (FPS view)
+// ─── PLAYER ──────────────────────────────────────────────────────────────────
 const player = {
-    x: 512,
-    y: 384,
+    x: TILE_SIZE * 1.5,
+    y: TILE_SIZE * 1.5,
     angle: 0,
-    speed: 3,
-    fov: Math.PI / 3, // 60 degrees
-    viewDistance: 800
+    speed: 2.5,
+    fov: Math.PI / 3,
+    viewDistance: TILE_SIZE * 10,
 };
 
-// Weapon state
+// ─── WEAPON ──────────────────────────────────────────────────────────────────
 const weapon = {
-    recoil: 0,
-    recoilMax: 15,
-    fireRate: 0,
-    fireRateMax: 10,
-    bobbing: 0,
-    bobbingAmount: 0
+    recoil: 0, recoilMax: 15,
+    fireRate: 0, fireRateMax: 10,
+    bobbing: 0, bobbingAmount: 0,
 };
 
-// Arrays
+// ─── ARRAYS ──────────────────────────────────────────────────────────────────
 const enemies = [];
-const projectiles = []; // balles visuelles tirées
+const projectiles = [];
 let nextEnemyId = 0;
+let zBuffer = new Array(canvas.width).fill(Infinity);
 
-// Input
+// ─── INPUT ───────────────────────────────────────────────────────────────────
 const keys = {};
 let lastMouseX = canvas.width / 2;
 
-// Event listeners
-window.addEventListener('keydown', (e) => {
+window.addEventListener('keydown', e => {
     keys[e.key.toUpperCase()] = true;
-    if (e.key === 'r' || e.key === 'R') {
-        reload();
-    }
+    if (e.key === 'r' || e.key === 'R') reload();
 });
+window.addEventListener('keyup', e => { keys[e.key.toUpperCase()] = false; });
 
-window.addEventListener('keyup', (e) => {
-    keys[e.key.toUpperCase()] = false;
-});
-
-canvas.addEventListener('mousemove', (e) => {
+canvas.addEventListener('mousemove', e => {
     const rect = canvas.getBoundingClientRect();
-    const mouseX = e.clientX - rect.left;
-    const delta = mouseX - lastMouseX;
-    player.angle += delta * 0.01;
-    lastMouseX = mouseX;
+    const mx = e.clientX - rect.left;
+    player.angle += (mx - lastMouseX) * 0.003;
+    lastMouseX = mx;
 });
-
-// Clic gauche = tirer
-canvas.addEventListener('mousedown', (e) => {
+canvas.addEventListener('mousedown', e => {
     if (e.button === 0) shoot();
-});
-
-// Clic droit = viser (ADS)
-canvas.addEventListener('mousedown', (e) => {
     if (e.button === 2) game.aiming = true;
 });
-canvas.addEventListener('mouseup', (e) => {
-    if (e.button === 2) game.aiming = false;
-});
+canvas.addEventListener('mouseup', e => { if (e.button === 2) game.aiming = false; });
+canvas.addEventListener('contextmenu', e => e.preventDefault());
 
-// Désactiver le menu contextuel sur clic droit
-canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+// ─── MAP HELPERS ─────────────────────────────────────────────────────────────
+function isWall(x, y) {
+    const tx = Math.floor(x / TILE_SIZE);
+    const ty = Math.floor(y / TILE_SIZE);
+    if (tx < 0 || tx >= MAP_W || ty < 0 || ty >= MAP_H) return true;
+    return MAP[ty][tx] === 1;
+}
 
-// Enemy class
+function canMove(x, y) {
+    const r = 14;
+    return !isWall(x + r, y + r) && !isWall(x - r, y + r)
+        && !isWall(x + r, y - r) && !isWall(x - r, y - r);
+}
+
+// ─── ENEMY CLASS ─────────────────────────────────────────────────────────────
 class Enemy {
     constructor(x, y) {
         this.id = nextEnemyId++;
-        this.x = x;
-        this.y = y;
-        this.width = 40;
-        this.height = 60;
-        this.speed = 1.2;
+        this.x = x; this.y = y;
+        this.speed = 0.7 + game.wave * 0.1;
         this.hp = 1;
         this.distance = 0;
     }
@@ -118,161 +117,239 @@ class Enemy {
         const dy = player.y - this.y;
         this.distance = Math.sqrt(dx * dx + dy * dy);
 
-        // Move towards player
-        const angle = Math.atan2(dy, dx);
-        this.x += Math.cos(angle) * this.speed;
-        this.y += Math.sin(angle) * this.speed;
+        const ang = Math.atan2(dy, dx);
+        const nx = this.x + Math.cos(ang) * this.speed;
+        const ny = this.y + Math.sin(ang) * this.speed;
+        if (!isWall(nx, this.y)) this.x = nx;
+        if (!isWall(this.x, ny)) this.y = ny;
 
-        // Check if hit player
-        if (this.distance < 40) {
-            return 'hit';
-        }
+        if (this.distance < 28) return 'hit';
         return null;
-    }
-
-    isHitByRaycast(angle, maxDist) {
-        const dx = this.x - player.x;
-        const dy = this.y - player.y;
-        const dist = Math.sqrt(dx * dx + dy * dy);
-
-        if (dist > maxDist) return false;
-
-        const angleTo = Math.atan2(dy, dx);
-
-        // Normaliser la différence d'angle entre -PI et PI
-        let angleDiff = angleTo - angle;
-        while (angleDiff > Math.PI)  angleDiff -= 2 * Math.PI;
-        while (angleDiff < -Math.PI) angleDiff += 2 * Math.PI;
-
-        return Math.abs(angleDiff) < 0.2;
-    }
-
-    drawFirstPerson(screenX, screenWidth, distanceToCenter) {
-        if (this.distance > player.viewDistance) return;
-
-        // Calculate size based on distance (smaller = farther)
-        const scale = 100 / this.distance;
-        const size = Math.max(20, Math.min(300, this.height * scale));
-
-        const screenY = canvas.height / 2 - size / 2;
-        const screenWidth_ = size * 0.6;
-
-        // Color based on distance (darker = farther)
-        const colorIntensity = Math.max(0.3, 1 - this.distance / player.viewDistance);
-        const r = Math.floor(255 * colorIntensity);
-        const g = 0;
-        const b = 0;
-
-        // Draw enemy as red square
-        ctx.fillStyle = `rgb(${r}, ${g}, ${b})`;
-        ctx.fillRect(screenX, screenY, screenWidth_, size);
-
-        // Eyes
-        const eyeSize = size * 0.1;
-        ctx.fillStyle = '#ffff00';
-        ctx.fillRect(screenX + screenWidth_ * 0.3, screenY + size * 0.3, eyeSize, eyeSize);
-        ctx.fillRect(screenX + screenWidth_ * 0.6, screenY + size * 0.3, eyeSize, eyeSize);
-
-        ctx.strokeStyle = `rgb(${r}, 100, 0)`;
-        ctx.lineWidth = 2;
-        ctx.strokeRect(screenX, screenY, screenWidth_, size);
     }
 }
 
+// ─── RAYCASTING ──────────────────────────────────────────────────────────────
+function castRays() {
+    const W = canvas.width, H = canvas.height;
+
+    // Smooth ADS zoom via FOV
+    const targetFOV = game.aiming ? game.baseFOV * 0.4 : game.baseFOV;
+    player.fov += (targetFOV - player.fov) * 0.12;
+
+    // Ciel
+    const skyGrad = ctx.createLinearGradient(0, 0, 0, H / 2);
+    skyGrad.addColorStop(0, '#3a5a8a');
+    skyGrad.addColorStop(1, '#c8a86b');
+    ctx.fillStyle = skyGrad;
+    ctx.fillRect(0, 0, W, H / 2);
+
+    // Sol
+    const floorGrad = ctx.createLinearGradient(0, H / 2, 0, H);
+    floorGrad.addColorStop(0, '#b8895a');
+    floorGrad.addColorStop(1, '#6a4c2a');
+    ctx.fillStyle = floorGrad;
+    ctx.fillRect(0, H / 2, W, H / 2);
+
+    // Rayons
+    zBuffer = new Array(W).fill(Infinity);
+
+    for (let col = 0; col < W; col++) {
+        const rayAngle = player.angle - player.fov / 2 + (col / W) * player.fov;
+        const rdx = Math.cos(rayAngle);
+        const rdy = Math.sin(rayAngle);
+
+        let mx = Math.floor(player.x / TILE_SIZE);
+        let my = Math.floor(player.y / TILE_SIZE);
+
+        const ddx = Math.abs(1 / (rdx || 1e-10));
+        const ddy = Math.abs(1 / (rdy || 1e-10));
+
+        let sdx, sdy, stepX, stepY;
+        if (rdx < 0) { stepX = -1; sdx = (player.x / TILE_SIZE - mx) * ddx; }
+        else          { stepX =  1; sdx = (mx + 1 - player.x / TILE_SIZE) * ddx; }
+        if (rdy < 0) { stepY = -1; sdy = (player.y / TILE_SIZE - my) * ddy; }
+        else          { stepY =  1; sdy = (my + 1 - player.y / TILE_SIZE) * ddy; }
+
+        let side = 0, hit = false, steps = 0;
+        while (!hit && steps++ < 40) {
+            if (sdx < sdy) { sdx += ddx; mx += stepX; side = 0; }
+            else           { sdy += ddy; my += stepY; side = 1; }
+            if (mx < 0 || mx >= MAP_W || my < 0 || my >= MAP_H || MAP[my][mx] === 1) hit = true;
+        }
+
+        let dist;
+        if (side === 0) dist = (mx - player.x / TILE_SIZE + (1 - stepX) / 2) / rdx;
+        else            dist = (my - player.y / TILE_SIZE + (1 - stepY) / 2) / rdy;
+        if (dist < 0.01) dist = 0.01;
+
+        // Stocker distance en pixels pour le zbuffer
+        zBuffer[col] = dist * TILE_SIZE;
+
+        // Hauteur de la tranche
+        const wallH = Math.min(H * 5, Math.floor(H / dist));
+        const drawStart = Math.max(0, (H - wallH) >> 1);
+        const drawEnd   = Math.min(H - 1, (H + wallH) >> 1);
+
+        // Couleur sable avec ombrage
+        const bright = side === 0 ? 1.0 : 0.6;
+        const fog    = Math.max(0.1, 1 - (dist * TILE_SIZE) / player.viewDistance);
+        const r = Math.min(255, Math.floor((170 * fog + 40) * bright));
+        const g = Math.min(255, Math.floor((120 * fog + 20) * bright));
+        const b = Math.min(255, Math.floor(( 60 * fog + 10) * bright));
+
+        ctx.fillStyle = `rgb(${r},${g},${b})`;
+        ctx.fillRect(col, drawStart, 1, drawEnd - drawStart + 1);
+    }
+}
+
+// ─── DRAW ENEMIES ────────────────────────────────────────────────────────────
+function drawEnemies() {
+    const W = canvas.width, H = canvas.height;
+    const projFactor = (W / 2) / Math.tan(player.fov / 2);
+
+    // Peintre : plus loin d'abord
+    const sorted = [...enemies].sort((a, b) => b.distance - a.distance);
+
+    for (const e of sorted) {
+        const dx = e.x - player.x;
+        const dy = e.y - player.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist < 1) continue;
+
+        let relAngle = Math.atan2(dy, dx) - player.angle;
+        while (relAngle >  Math.PI) relAngle -= 2 * Math.PI;
+        while (relAngle < -Math.PI) relAngle += 2 * Math.PI;
+
+        // Hors champ ou derrière
+        if (Math.abs(relAngle) > player.fov / 2 + 0.4) continue;
+        if (Math.abs(relAngle) >= Math.PI / 2 - 0.05) continue;
+
+        const screenX    = Math.floor(W / 2 + Math.tan(relAngle) * projFactor);
+        const spriteH    = Math.min(H * 3, Math.floor(H * TILE_SIZE / dist));
+        const spriteW    = Math.floor(spriteH * 0.65);
+        const top        = Math.max(0, (H - spriteH) >> 1);
+        const bottom     = Math.min(H - 1, (H + spriteH) >> 1);
+        const left       = screenX - (spriteW >> 1);
+        const right      = left + spriteW;
+        const intensity  = Math.max(0.15, 1 - dist / player.viewDistance);
+
+        // Tranche par tranche avec vérification zbuffer
+        for (let col = left; col < right; col++) {
+            if (col < 0 || col >= W) continue;
+            if (dist >= zBuffer[col]) continue;
+
+            const r = Math.floor(230 * intensity);
+            ctx.fillStyle = `rgb(${r},0,0)`;
+            ctx.fillRect(col, top, 1, bottom - top);
+        }
+
+        // Yeux
+        if (spriteH > 20) {
+            const eyeS = Math.max(2, spriteH * 0.09);
+            const eyeY = top + (bottom - top) * 0.28;
+            ctx.fillStyle = `rgba(255,255,0,${intensity})`;
+            ctx.fillRect(screenX - spriteW * 0.22, eyeY, eyeS, eyeS);
+            ctx.fillRect(screenX + spriteW * 0.08, eyeY, eyeS, eyeS);
+        }
+    }
+}
+
+// ─── SHOOT ───────────────────────────────────────────────────────────────────
 function shoot() {
-    if (game.gameOver || game.ammo <= 0) return;
-    if (weapon.fireRate > 0) return;
+    if (game.gameOver || game.ammo <= 0 || weapon.fireRate > 0) return;
 
     game.ammo--;
     weapon.fireRate = weapon.fireRateMax;
-    weapon.recoil = weapon.recoilMax;
+    weapon.recoil  = weapon.recoilMax;
 
-    // Ajouter un projectile visuel (balle de billard)
+    // Projectile visuel
     const gunX = canvas.width - 300 + weapon.recoil * 5;
     const gunY = canvas.height - 240;
-    projectiles.push({
-        x: gunX + 40,
-        y: gunY + 80,
-        targetX: canvas.width / 2,
-        targetY: canvas.height / 2,
-        size: 40,
-        life: 1.0  // 1.0 = neuf, diminue jusqu'à 0
-    });
+    projectiles.push({ x: gunX + 40, y: gunY + 80, targetX: canvas.width / 2, targetY: canvas.height / 2, size: 40, life: 1.0 });
 
-    // Détection : l'ennemi est-il affiché près du viseur (centre écran) ?
-    const centerX = canvas.width / 2;
-    for (let i = enemies.length - 1; i >= 0; i--) {
-        const enemy = enemies[i];
-        const angleDiff = player.angle - Math.atan2(enemy.y - player.y, enemy.x - player.x);
-        const screenX = centerX + Math.sin(angleDiff) * 200;
-        const onScreen = Math.abs(screenX - centerX) < 50 && enemy.distance < player.viewDistance;
-        if (onScreen) {
-            enemy.hp--;
-            if (enemy.hp <= 0) {
-                enemies.splice(i, 1);
-                game.score += 100;
-                game.enemiesDefeated++;
+    // Détection d'impact : ennemi le plus proche au centre de l'écran
+    const W = canvas.width;
+    const projFactor = (W / 2) / Math.tan(player.fov / 2);
+    let best = null, bestDist = Infinity;
 
-                // Next wave
-                if (game.enemiesDefeated % 5 === 0) {
-                    game.wave++;
-                    spawnEnemies();
-                }
+    for (const e of enemies) {
+        const dx = e.x - player.x;
+        const dy = e.y - player.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+
+        let relAngle = Math.atan2(dy, dx) - player.angle;
+        while (relAngle >  Math.PI) relAngle -= 2 * Math.PI;
+        while (relAngle < -Math.PI) relAngle += 2 * Math.PI;
+        if (Math.abs(relAngle) >= Math.PI / 2 - 0.05) continue;
+
+        const screenX = Math.floor(W / 2 + Math.tan(relAngle) * projFactor);
+        const spriteW = Math.floor(Math.min(W * 3, Math.floor(W * TILE_SIZE / dist)) * 0.65);
+
+        if (Math.abs(screenX - W / 2) < spriteW / 2 + 10 && dist < bestDist && dist < player.viewDistance) {
+            best = e;
+            bestDist = dist;
+        }
+    }
+
+    if (best) {
+        best.hp--;
+        if (best.hp <= 0) {
+            enemies.splice(enemies.indexOf(best), 1);
+            game.score += 100;
+            game.enemiesDefeated++;
+            if (game.enemiesDefeated % 5 === 0) {
+                game.wave++;
+                spawnEnemies();
             }
-            break;
         }
     }
 }
 
-function reload() {
-    game.ammo = game.maxAmmo;
-}
+// ─── RELOAD ──────────────────────────────────────────────────────────────────
+function reload() { game.ammo = game.maxAmmo; }
 
+// ─── SPAWN ENEMIES ───────────────────────────────────────────────────────────
 function spawnEnemies() {
-    const enemyCount = 2 + game.wave;
-    for (let i = 0; i < enemyCount; i++) {
-        let x, y;
-        const angle = Math.random() * Math.PI * 2;
-        const distance = 600 + Math.random() * 300;
-
-        x = player.x + Math.cos(angle) * distance;
-        y = player.y + Math.sin(angle) * distance;
-
-        enemies.push(new Enemy(x, y));
+    const count = 2 + game.wave;
+    let spawned = 0, tries = 0;
+    while (spawned < count && tries++ < 300) {
+        const tx = 1 + Math.floor(Math.random() * (MAP_W - 2));
+        const ty = 1 + Math.floor(Math.random() * (MAP_H - 2));
+        if (MAP[ty][tx] === 0) {
+            const wx = (tx + 0.5) * TILE_SIZE;
+            const wy = (ty + 0.5) * TILE_SIZE;
+            if (Math.hypot(wx - player.x, wy - player.y) > TILE_SIZE * 3) {
+                enemies.push(new Enemy(wx, wy));
+                spawned++;
+            }
+        }
     }
 }
 
+// ─── UPDATE PLAYER ───────────────────────────────────────────────────────────
 function updatePlayer() {
-    let moveX = 0;
-    let moveY = 0;
+    const spd = player.speed;
+    let mx = 0, my = 0;
 
-    if (keys['W']) {
-        moveX = Math.cos(player.angle) * player.speed;
-        moveY = Math.sin(player.angle) * player.speed;
-        weapon.bobbingAmount = 1;
-    }
-    if (keys['S']) {
-        moveX = Math.cos(player.angle) * -player.speed;
-        moveY = Math.sin(player.angle) * -player.speed;
-        weapon.bobbingAmount = 0.5;
-    }
+    if (keys['W']) { mx += Math.cos(player.angle) * spd; my += Math.sin(player.angle) * spd; weapon.bobbingAmount = 1; }
+    if (keys['S']) { mx -= Math.cos(player.angle) * spd; my -= Math.sin(player.angle) * spd; weapon.bobbingAmount = 0.6; }
+    if (keys['A']) { mx += Math.cos(player.angle - Math.PI / 2) * spd; my += Math.sin(player.angle - Math.PI / 2) * spd; weapon.bobbingAmount = 0.8; }
+    if (keys['D']) { mx += Math.cos(player.angle + Math.PI / 2) * spd; my += Math.sin(player.angle + Math.PI / 2) * spd; weapon.bobbingAmount = 0.8; }
 
-    player.x += moveX;
-    player.y += moveY;
+    // Collision glissante
+    if (canMove(player.x + mx, player.y)) player.x += mx;
+    if (canMove(player.x, player.y + my)) player.y += my;
 
-    // Update weapon state
     if (weapon.fireRate > 0) weapon.fireRate--;
-    if (weapon.recoil > 0) weapon.recoil -= 0.5;
-
-    // Weapon bobbing
+    if (weapon.recoil  > 0) weapon.recoil -= 0.5;
     weapon.bobbing += weapon.bobbingAmount * 0.05;
     weapon.bobbingAmount *= 0.95;
 }
 
+// ─── DRAW WEAPON ─────────────────────────────────────────────────────────────
 function drawWeapon() {
-    const gunW = 300;
-    const gunH = 240;
-    const gunX = canvas.width - gunW + weapon.recoil * 5;
+    const gunW = 300, gunH = 240;
+    const gunX = canvas.width  - gunW + weapon.recoil * 5;
     const gunY = canvas.height - gunH + Math.sin(weapon.bobbing) * 10;
 
     if (weaponImageLoaded) {
@@ -280,44 +357,66 @@ function drawWeapon() {
         ctx.drawImage(weaponImage, gunX, gunY, gunW, gunH);
         ctx.globalCompositeOperation = 'source-over';
     } else {
-        // Fallback: dessin codé
-        ctx.strokeStyle = '#666666';
-        ctx.lineWidth = 8;
-        ctx.beginPath();
-        ctx.moveTo(gunX + 50, gunY - 20);
-        ctx.lineTo(gunX + 120, gunY - 30);
-        ctx.stroke();
-        ctx.fillStyle = '#444444';
+        ctx.fillStyle = '#555';
         ctx.fillRect(gunX + 40, gunY, 40, 80);
-        ctx.fillStyle = '#555555';
+        ctx.fillStyle = '#444';
         ctx.fillRect(gunX + 50, gunY - 25, 60, 15);
     }
 
-    // Muzzle flash
+    // Flash de tir
     if (weapon.fireRate > weapon.fireRateMax - 5) {
-        ctx.fillStyle = 'rgba(255, 150, 0, 0.7)';
-        ctx.beginPath();
-        ctx.arc(gunX + 30, gunY + gunH * 0.35, 18, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.fillStyle = 'rgba(255, 220, 0, 0.5)';
-        ctx.beginPath();
-        ctx.arc(gunX + 30, gunY + gunH * 0.35, 10, 0, Math.PI * 2);
-        ctx.fill();
+        ctx.fillStyle = 'rgba(255,150,0,0.8)';
+        ctx.beginPath(); ctx.arc(gunX + 30, gunY + gunH * 0.35, 20, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = 'rgba(255,230,0,0.6)';
+        ctx.beginPath(); ctx.arc(gunX + 30, gunY + gunH * 0.35, 10, 0, Math.PI * 2); ctx.fill();
     }
 }
 
+// ─── MINIMAP ─────────────────────────────────────────────────────────────────
+function drawMinimap() {
+    const scale = 5;
+    const ox = 10;
+    const oy = canvas.height - MAP_H * scale - 10;
+
+    ctx.fillStyle = 'rgba(0,0,0,0.55)';
+    ctx.fillRect(ox - 2, oy - 2, MAP_W * scale + 4, MAP_H * scale + 4);
+
+    for (let y = 0; y < MAP_H; y++) {
+        for (let x = 0; x < MAP_W; x++) {
+            ctx.fillStyle = MAP[y][x] === 1 ? '#999' : '#2a2a2a';
+            ctx.fillRect(ox + x * scale, oy + y * scale, scale - 1, scale - 1);
+        }
+    }
+
+    // Ennemis
+    for (const e of enemies) {
+        ctx.fillStyle = '#f44';
+        ctx.fillRect(ox + (e.x / TILE_SIZE) * scale - 1.5, oy + (e.y / TILE_SIZE) * scale - 1.5, 3, 3);
+    }
+
+    // Joueur
+    const px = ox + (player.x / TILE_SIZE) * scale;
+    const py = oy + (player.y / TILE_SIZE) * scale;
+    ctx.fillStyle = '#0f0';
+    ctx.beginPath(); ctx.arc(px, py, 3, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = '#0f0'; ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(px, py);
+    ctx.lineTo(px + Math.cos(player.angle) * 8, py + Math.sin(player.angle) * 8);
+    ctx.stroke();
+}
+
+// ─── UPDATE ──────────────────────────────────────────────────────────────────
 function update() {
     if (game.gameOver) return;
 
     updatePlayer();
 
-    // Update enemies
     for (let i = enemies.length - 1; i >= 0; i--) {
-        const result = enemies[i].update();
-        if (result === 'hit') {
+        const res = enemies[i].update();
+        if (res === 'hit') {
             game.lives--;
             enemies.splice(i, 1);
-
             if (game.lives <= 0) {
                 game.gameOver = true;
                 document.getElementById('gameOver').style.display = 'block';
@@ -326,154 +425,73 @@ function update() {
         }
     }
 
-    // Spawn enemies if none
-    if (enemies.length === 0) {
-        spawnEnemies();
-    }
+    if (enemies.length === 0) spawnEnemies();
 
-    // Update UI
     document.getElementById('score').textContent = `Score: ${game.score}`;
     document.getElementById('lives').textContent = `Vies: ${game.lives}`;
-    document.getElementById('ammo').textContent = `Munitions: ${game.ammo}/${game.maxAmmo}`;
-    document.getElementById('wave').textContent = `Vague: ${game.wave}`;
+    document.getElementById('ammo').textContent  = `Munitions: ${game.ammo}/${game.maxAmmo}`;
+    document.getElementById('wave').textContent  = `Vague: ${game.wave}`;
 }
 
+// ─── DRAW ────────────────────────────────────────────────────────────────────
 function draw() {
-    // Zoom progressif quand on vise
-    const targetZoom = game.aiming ? 2.0 : 1.0;
-    game.zoomLevel += (targetZoom - game.zoomLevel) * 0.15;
-    const z = game.zoomLevel;
+    castRays(); // ciel + sol + murs
 
-    // Draw background avec zoom centré
-    if (backgroundLoaded) {
-        const sw = canvas.width / z;
-        const sh = canvas.height / z;
-        const sx = (backgroundImage.width - sw * (backgroundImage.width / canvas.width)) / 2;
-        const sy = (backgroundImage.height - sh * (backgroundImage.height / canvas.height)) / 2;
-        ctx.drawImage(backgroundImage, sx, sy, backgroundImage.width / z, backgroundImage.height / z, 0, 0, canvas.width, canvas.height);
-    } else {
-        // Fallback: Draw sky (gradient)
-        const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height / 2);
-        gradient.addColorStop(0, '#1a1a2e');
-        gradient.addColorStop(1, '#16213e');
-        ctx.fillStyle = gradient;
-        ctx.fillRect(0, 0, canvas.width, canvas.height / 2);
-
-        // Draw ground
-        ctx.fillStyle = '#0a0a0a';
-        ctx.fillRect(0, canvas.height / 2, canvas.width, canvas.height / 2);
-
-        // Draw horizon line
-        ctx.strokeStyle = '#00ff00';
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        ctx.moveTo(0, canvas.height / 2);
-        ctx.lineTo(canvas.width, canvas.height / 2);
-        ctx.stroke();
-    }
-
-    // Sort enemies by distance (painter's algorithm)
-    enemies.sort((a, b) => b.distance - a.distance);
-
-    // Draw enemies
-    const centerX = canvas.width / 2;
-    for (let i = 0; i < enemies.length; i++) {
-        const enemy = enemies[i];
-        const angleDiff = player.angle - Math.atan2(enemy.y - player.y, enemy.x - player.x);
-        const screenX = centerX + Math.sin(angleDiff) * 200;
-
-        enemy.drawFirstPerson(screenX, 100, angleDiff);
-    }
-
-    // Draw et update projectiles (balles de billard)
+    // Projectiles visuels
     for (let i = projectiles.length - 1; i >= 0; i--) {
         const p = projectiles[i];
         p.life -= 0.06;
         if (p.life <= 0) { projectiles.splice(i, 1); continue; }
-
-        // Interpolation vers le viseur
         p.x += (p.targetX - p.x) * 0.18;
         p.y += (p.targetY - p.y) * 0.18;
-
         const s = p.size * p.life;
         ctx.globalAlpha = p.life;
-        if (enemyImageLoaded) {
-            ctx.drawImage(enemyImage, p.x - s / 2, p.y - s / 2, s, s);
-        } else {
-            ctx.fillStyle = '#222277';
-            ctx.beginPath();
-            ctx.arc(p.x, p.y, s / 2, 0, Math.PI * 2);
-            ctx.fill();
-        }
-        ctx.globalAlpha = 1.0;
+        if (enemyImageLoaded) ctx.drawImage(enemyImage, p.x - s / 2, p.y - s / 2, s, s);
+        else { ctx.fillStyle = '#22f'; ctx.beginPath(); ctx.arc(p.x, p.y, s / 2, 0, Math.PI * 2); ctx.fill(); }
+        ctx.globalAlpha = 1;
     }
 
-    // Draw weapon
+    drawEnemies();
     drawWeapon();
+    drawMinimap();
 
-    // Draw crosshair
-    const cx = canvas.width / 2;
-    const cy = canvas.height / 2;
+    // Viseur
+    const cx = canvas.width / 2, cy = canvas.height / 2;
     ctx.lineCap = 'round';
 
     if (game.aiming) {
-        // Mode visée : petit cercle rouge précis
-        ctx.strokeStyle = 'rgba(0,0,0,0.7)';
-        ctx.lineWidth = 3;
-        ctx.beginPath();
-        ctx.arc(cx, cy, 14, 0, Math.PI * 2);
-        ctx.stroke();
-        ctx.beginPath();
-        ctx.moveTo(cx - 20, cy); ctx.lineTo(cx + 20, cy);
-        ctx.moveTo(cx, cy - 20); ctx.lineTo(cx, cy + 20);
-        ctx.stroke();
-
-        ctx.strokeStyle = '#ff4444';
-        ctx.lineWidth = 1.5;
-        ctx.beginPath();
-        ctx.arc(cx, cy, 14, 0, Math.PI * 2);
-        ctx.stroke();
-        ctx.beginPath();
-        ctx.moveTo(cx - 20, cy); ctx.lineTo(cx + 20, cy);
-        ctx.moveTo(cx, cy - 20); ctx.lineTo(cx, cy + 20);
-        ctx.stroke();
+        ctx.strokeStyle = 'rgba(0,0,0,0.7)'; ctx.lineWidth = 3;
+        ctx.beginPath(); ctx.arc(cx, cy, 10, 0, Math.PI * 2); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(cx-16,cy); ctx.lineTo(cx+16,cy); ctx.moveTo(cx,cy-16); ctx.lineTo(cx,cy+16); ctx.stroke();
+        ctx.strokeStyle = '#f44'; ctx.lineWidth = 1.5;
+        ctx.beginPath(); ctx.arc(cx, cy, 10, 0, Math.PI * 2); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(cx-16,cy); ctx.lineTo(cx+16,cy); ctx.moveTo(cx,cy-16); ctx.lineTo(cx,cy+16); ctx.stroke();
     } else {
-        // Mode normal : croix blanche avec gap
-        const gap = 5;
-        const len = 18;
-
-        ctx.strokeStyle = 'rgba(0,0,0,0.7)';
-        ctx.lineWidth = 4;
+        const gap = 5, len = 15;
+        ctx.strokeStyle = 'rgba(0,0,0,0.7)'; ctx.lineWidth = 4;
         ctx.beginPath();
-        ctx.moveTo(cx - gap - len, cy); ctx.lineTo(cx - gap, cy);
-        ctx.moveTo(cx + gap, cy);       ctx.lineTo(cx + gap + len, cy);
-        ctx.moveTo(cx, cy - gap - len); ctx.lineTo(cx, cy - gap);
-        ctx.moveTo(cx, cy + gap);       ctx.lineTo(cx, cy + gap + len);
+        ctx.moveTo(cx-gap-len,cy); ctx.lineTo(cx-gap,cy);
+        ctx.moveTo(cx+gap,cy);     ctx.lineTo(cx+gap+len,cy);
+        ctx.moveTo(cx,cy-gap-len); ctx.lineTo(cx,cy-gap);
+        ctx.moveTo(cx,cy+gap);     ctx.lineTo(cx,cy+gap+len);
         ctx.stroke();
-
-        ctx.strokeStyle = '#ffffff';
-        ctx.lineWidth = 2;
+        ctx.strokeStyle = '#fff'; ctx.lineWidth = 2;
         ctx.beginPath();
-        ctx.moveTo(cx - gap - len, cy); ctx.lineTo(cx - gap, cy);
-        ctx.moveTo(cx + gap, cy);       ctx.lineTo(cx + gap + len, cy);
-        ctx.moveTo(cx, cy - gap - len); ctx.lineTo(cx, cy - gap);
-        ctx.moveTo(cx, cy + gap);       ctx.lineTo(cx, cy + gap + len);
+        ctx.moveTo(cx-gap-len,cy); ctx.lineTo(cx-gap,cy);
+        ctx.moveTo(cx+gap,cy);     ctx.lineTo(cx+gap+len,cy);
+        ctx.moveTo(cx,cy-gap-len); ctx.lineTo(cx,cy-gap);
+        ctx.moveTo(cx,cy+gap);     ctx.lineTo(cx,cy+gap+len);
         ctx.stroke();
-
-        ctx.fillStyle = '#ffffff';
-        ctx.beginPath();
-        ctx.arc(cx, cy, 2, 0, Math.PI * 2);
-        ctx.fill();
+        ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(cx, cy, 2, 0, Math.PI * 2); ctx.fill();
     }
 }
 
-// Game loop
+// ─── GAME LOOP ────────────────────────────────────────────────────────────────
 function gameLoop() {
     update();
     draw();
     requestAnimationFrame(gameLoop);
 }
 
-// Start game
 spawnEnemies();
 gameLoop();
