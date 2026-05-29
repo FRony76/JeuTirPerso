@@ -276,7 +276,9 @@ function drawWeapon() {
     const gunY = canvas.height - gunH + Math.sin(weapon.bobbing) * 10;
 
     if (weaponImageLoaded) {
+        ctx.globalCompositeOperation = 'multiply';
         ctx.drawImage(weaponImage, gunX, gunY, gunW, gunH);
+        ctx.globalCompositeOperation = 'source-over';
     } else {
         // Fallback: dessin codé
         ctx.strokeStyle = '#666666';
