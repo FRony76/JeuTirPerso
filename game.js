@@ -16,6 +16,12 @@ enemyImage.src = 'billiard.webp';
 let enemyImageLoaded = false;
 enemyImage.onload = () => { enemyImageLoaded = true; };
 
+// Load weapon image
+const weaponImage = new Image();
+weaponImage.src = 'arme1.avif';
+let weaponImageLoaded = false;
+weaponImage.onload = () => { weaponImageLoaded = true; };
+
 // Game state
 const game = {
     score: 0,
@@ -182,11 +188,11 @@ function shoot() {
     weapon.recoil = weapon.recoilMax;
 
     // Ajouter un projectile visuel (balle de billard)
-    const gunX = canvas.width - 150 + weapon.recoil * 5;
-    const gunY = canvas.height - 120;
+    const gunX = canvas.width - 300 + weapon.recoil * 5;
+    const gunY = canvas.height - 240;
     projectiles.push({
-        x: gunX + 60,
-        y: gunY,
+        x: gunX + 40,
+        y: gunY + 80,
         targetX: canvas.width / 2,
         targetY: canvas.height / 2,
         size: 40,
@@ -264,41 +270,37 @@ function updatePlayer() {
 }
 
 function drawWeapon() {
-    const gunX = canvas.width - 150 + weapon.recoil * 5;
-    const gunY = canvas.height - 150 + Math.sin(weapon.bobbing) * 10;
+    const gunW = 300;
+    const gunH = 240;
+    const gunX = canvas.width - gunW + weapon.recoil * 5;
+    const gunY = canvas.height - gunH + Math.sin(weapon.bobbing) * 10;
 
-    // Gun barrel
-    ctx.strokeStyle = '#666666';
-    ctx.lineWidth = 8;
-    ctx.beginPath();
-    ctx.moveTo(gunX + 50, gunY - 20);
-    ctx.lineTo(gunX + 120, gunY - 30);
-    ctx.stroke();
-
-    // Gun grip
-    ctx.fillStyle = '#444444';
-    ctx.fillRect(gunX + 40, gunY, 40, 80);
-
-    // Gun slide
-    ctx.fillStyle = '#555555';
-    ctx.fillRect(gunX + 50, gunY - 25, 60, 15);
-
-    // Sights
-    ctx.strokeStyle = '#00ff00';
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.moveTo(gunX + 60, gunY - 35);
-    ctx.lineTo(gunX + 60, gunY - 50);
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.moveTo(gunX + 110, gunY - 40);
-    ctx.lineTo(gunX + 110, gunY - 50);
-    ctx.stroke();
+    if (weaponImageLoaded) {
+        ctx.drawImage(weaponImage, gunX, gunY, gunW, gunH);
+    } else {
+        // Fallback: dessin codé
+        ctx.strokeStyle = '#666666';
+        ctx.lineWidth = 8;
+        ctx.beginPath();
+        ctx.moveTo(gunX + 50, gunY - 20);
+        ctx.lineTo(gunX + 120, gunY - 30);
+        ctx.stroke();
+        ctx.fillStyle = '#444444';
+        ctx.fillRect(gunX + 40, gunY, 40, 80);
+        ctx.fillStyle = '#555555';
+        ctx.fillRect(gunX + 50, gunY - 25, 60, 15);
+    }
 
     // Muzzle flash
     if (weapon.fireRate > weapon.fireRateMax - 5) {
         ctx.fillStyle = 'rgba(255, 150, 0, 0.7)';
-        ctx.fillRect(gunX + 115, gunY - 30, 30, 20);
+        ctx.beginPath();
+        ctx.arc(gunX + 30, gunY + gunH * 0.35, 18, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = 'rgba(255, 220, 0, 0.5)';
+        ctx.beginPath();
+        ctx.arc(gunX + 30, gunY + gunH * 0.35, 10, 0, Math.PI * 2);
+        ctx.fill();
     }
 }
 
