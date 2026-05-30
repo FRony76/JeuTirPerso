@@ -82,7 +82,6 @@ let zBuffer = new Array(canvas.width).fill(Infinity);
 
 // ─── INPUT ───────────────────────────────────────────────────────────────────
 const keys = {};
-let lastMouseX = canvas.width / 2;
 
 window.addEventListener('keydown', e => {
     keys[e.key.toUpperCase()] = true;
@@ -90,13 +89,22 @@ window.addEventListener('keydown', e => {
 });
 window.addEventListener('keyup', e => { keys[e.key.toUpperCase()] = false; });
 
-canvas.addEventListener('mousemove', e => {
-    const rect = canvas.getBoundingClientRect();
-    const mx = e.clientX - rect.left;
-    player.angle += (mx - lastMouseX) * 0.003;
-    lastMouseX = mx;
+// Pointer Lock : clic sur le canvas capture la souris
+canvas.addEventListener('click', () => {
+    if (document.pointerLockElement !== canvas) {
+        canvas.requestPointerLock();
+    }
 });
+
+// Rotation caméra via déplacement relatif (souris toujours capturée)
+document.addEventListener('mousemove', e => {
+    if (document.pointerLockElement === canvas) {
+        player.angle += e.movementX * 0.003;
+    }
+});
+
 canvas.addEventListener('mousedown', e => {
+    if (document.pointerLockElement !== canvas) return;
     if (e.button === 0) shoot();
     if (e.button === 2) game.aiming = true;
 });
@@ -286,11 +294,13 @@ function drawEnemies() {
             if (hasVisible) {
                 ctx.clip();
                 ctx.globalAlpha = Math.min(1, intensity + 0.25);
+                ctx.globalCompositeOperation = 'multiply';
                 // Grand personnage debout (zone droite du sprite sheet)
                 ctx.drawImage(ennemiImage,
                     frameX, 0, frameW, frameH,       // source : grand perso debout
                     left, top, spriteW, bottom - top  // destination
                 );
+                ctx.globalCompositeOperation = 'source-over';
                 ctx.globalAlpha = 1;
             }
             ctx.restore();
@@ -505,6 +515,17 @@ function draw() {
     drawEnemies();
     drawWeapon();
     drawMinimap();
+
+    // Message "cliquer pour jouer" si souris non capturée
+    if (document.pointerLockElement !== canvas) {
+        ctx.fillStyle = 'rgba(0,0,0,0.55)';
+        ctx.fillRect(canvas.width/2 - 200, canvas.height/2 - 30, 400, 60);
+        ctx.fillStyle = '#fff';
+        ctx.font = 'bold 22px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText('Cliquez pour jouer', canvas.width/2, canvas.height/2 + 8);
+        ctx.textAlign = 'left';
+    }
 
     // Viseur
     const cx = canvas.width / 2, cy = canvas.height / 2;
