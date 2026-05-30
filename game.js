@@ -480,6 +480,7 @@ function update() {
             enemies.splice(i, 1);
             if (game.lives <= 0) {
                 game.gameOver = true;
+                document.exitPointerLock();
                 document.getElementById('gameOver').style.display = 'block';
                 document.getElementById('finalScore').textContent = `Score: ${game.score} | Vague: ${game.wave}`;
             }
