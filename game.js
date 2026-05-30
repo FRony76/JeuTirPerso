@@ -12,19 +12,44 @@ window.addEventListener('resize', () => {
 
 // ─── MAP ─────────────────────────────────────────────────────────────────────
 const TILE_SIZE = 64;
+// 0=sol  1=béton (immeuble A)  2=brique (immeuble B)  3=métal industriel
 const MAP = [
-  [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
-  [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
-  [1,0,1,1,0,1,1,0,0,1,1,0,1,1,0,1],
-  [1,0,1,0,0,0,0,0,0,0,0,0,0,1,0,1],
-  [1,0,0,0,1,0,1,1,1,1,0,1,0,0,0,1],
-  [1,0,1,0,1,0,1,0,0,1,0,1,0,1,0,1],
-  [1,0,1,0,0,0,0,0,0,0,0,0,0,1,0,1],
-  [1,0,0,0,1,0,1,0,0,1,0,1,0,0,0,1],
-  [1,0,1,0,1,0,1,1,1,1,0,1,0,1,0,1],
-  [1,0,1,0,0,0,0,0,0,0,0,0,0,1,0,1],
-  [1,0,0,1,1,0,1,1,0,1,1,0,1,1,0,1],
-  [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+  [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+  [1,0,0,0,1,0,0,0,0,0,0,0,0,0,0,2,0,0,0,1],
+  [1,0,1,0,1,0,0,1,0,0,0,0,0,0,0,2,0,2,0,1],
+  [1,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,2,0,1],
+  [1,1,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+  [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+  [1,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2,2,1],
+  [1,0,0,0,1,1,0,0,0,0,0,0,3,3,0,0,0,0,0,1],
+  [1,0,0,0,0,0,0,0,0,0,0,0,3,0,0,0,0,0,0,1],
+  [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,3,1],
+  [1,0,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,3,1],
+  [1,0,0,0,0,0,0,0,0,0,0,0,3,3,3,0,3,3,3,1],
+  [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+  [1,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,2,2,0,1],
+  [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2,0,2,1],
+  [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+];
+
+// Hauteurs de sol : 0=rez-de-chaussée, 4=un étage (escaliers cols 8-10 rangées 6→8)
+const FLOOR_H = [
+  [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+  [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+  [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+  [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+  [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+  [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+  [0,0,0,0,0,0,0,0,1,1,1,0,0,0,0,0,0,0,0,0],
+  [0,0,0,0,0,0,0,0,2,2,2,0,0,0,0,0,0,0,0,0],
+  [0,0,0,0,0,0,0,0,3,3,3,0,0,0,0,0,0,0,0,0],
+  [0,0,0,0,0,0,0,0,4,4,4,4,4,4,0,0,0,0,0,0],
+  [0,0,0,0,0,0,0,0,4,4,4,4,4,4,0,0,0,0,0,0],
+  [0,0,0,0,0,0,0,0,4,4,4,0,0,0,0,0,0,0,0,0],
+  [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+  [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+  [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+  [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
 ];
 const MAP_W = MAP[0].length;
 const MAP_H = MAP.length;
@@ -50,16 +75,20 @@ weaponImage.onload = () => { weaponImageLoaded = true; };
 
 // ─── TEXTURES PROCÉDURALES ───────────────────────────────────────────────────
 const TEX = 128;
-const wallTex  = new Uint8ClampedArray(TEX * TEX * 4);
+// 3 textures de murs différentes + sol
+const wallTex = [
+    null,
+    new Uint8ClampedArray(TEX * TEX * 4), // 1 béton+lierre
+    new Uint8ClampedArray(TEX * TEX * 4), // 2 vieille brique
+    new Uint8ClampedArray(TEX * TEX * 4), // 3 métal rouillé
+];
 const floorTex = new Uint8ClampedArray(TEX * TEX * 4);
 
 (function generateTextures() {
-    // Pseudo-random basé sur position
     function rng(x, y) {
         const n = Math.sin(x * 127.1 + y * 311.7) * 43758.5453;
         return n - Math.floor(n);
     }
-    // Bruit lissé (interpolation cubique)
     function smooth(x, y, s) {
         const xi = (x / s) | 0, yi = (y / s) | 0;
         const xf = x / s - xi, yf = y / s - yi;
@@ -67,89 +96,88 @@ const floorTex = new Uint8ClampedArray(TEX * TEX * 4);
         return rng(xi,yi)*(1-ux)*(1-uy) + rng(xi+1,yi)*ux*(1-uy)
              + rng(xi,yi+1)*(1-ux)*uy   + rng(xi+1,yi+1)*ux*uy;
     }
-    // FBM multi-échelle
     function fbm(x, y) {
         return smooth(x,y,32)*0.50 + smooth(x,y,16)*0.30 + smooth(x,y,8)*0.20;
     }
+    function clamp(v) { return Math.max(0, Math.min(255, v | 0)); }
 
     for (let y = 0; y < TEX; y++) {
         for (let x = 0; x < TEX; x++) {
             const i  = (y * TEX + x) * 4;
-            const fy = y / TEX; // 0 = haut, 1 = bas
+            const fy = y / TEX;
 
-            // ── MUR : béton d'immeuble abandonné ─────────────────────────────
-            let wr = 108, wg = 102, wb = 92; // gris béton chaud
-
-            // Joints de panneaux préfabriqués (2 × 4 panneaux par texture)
-            const jw = TEX >> 1, jh = TEX >> 2;
-            const isJoint = (x % jw < 4) || (y % jh < 4);
-            if (isJoint) { wr -= 30; wg -= 28; wb -= 22; }
-
-            // Variation de surface béton
-            const cv = fbm(x + 500, y + 500);
-            wr += ((cv - 0.5) * 28) | 0;
-            wg += ((cv - 0.5) * 22) | 0;
-            wb += ((cv - 0.5) * 18) | 0;
-
-            // Mousse / végétation : haut (lierre qui retombe) + bas (repousse du sol) + joints
-            const mossTop   = Math.pow(Math.max(0, 1 - fy * 3), 2) * 0.9;
-            const mossBot   = Math.pow(Math.max(0, (fy - 0.55) * 2.5), 2) * 0.95;
-            const mossJoint = isJoint ? 0.28 : 0;
-            const mossN     = fbm(x, y) * (0.42 + mossTop + mossBot + mossJoint);
-            if (mossN > 0.42) {
-                const bl = Math.min(1, (mossN - 0.42) / 0.28);
-                wr = ((wr * (1 - bl)) + 40 * bl + 0.5) | 0;
-                wg = ((wg * (1 - bl)) + 100 * bl + 0.5) | 0;
-                wb = ((wb * (1 - bl)) + 28 * bl + 0.5) | 0;
+            // ── TYPE 1 : béton préfabriqué + lierre (immeuble A) ─────────────
+            {
+                const t = wallTex[1];
+                let wr = 108, wg = 102, wb = 92;
+                const isJoint = (x % (TEX>>1) < 4) || (y % (TEX>>2) < 4);
+                if (isJoint) { wr -= 30; wg -= 28; wb -= 22; }
+                const cv = fbm(x+500, y+500);
+                wr += ((cv-0.5)*28)|0; wg += ((cv-0.5)*22)|0; wb += ((cv-0.5)*18)|0;
+                const mTop = Math.pow(Math.max(0, 1-fy*3), 2)*0.9;
+                const mBot = Math.pow(Math.max(0, (fy-0.55)*2.5), 2)*0.95;
+                const mN   = fbm(x,y) * (0.42 + mTop + mBot + (isJoint?0.28:0));
+                if (mN > 0.42) {
+                    const bl = Math.min(1,(mN-0.42)/0.28);
+                    wr=((wr*(1-bl))+40*bl+0.5)|0; wg=((wg*(1-bl))+100*bl+0.5)|0; wb=((wb*(1-bl))+28*bl+0.5)|0;
+                }
+                const st = smooth(x+200,0,20);
+                if (st>0.70){const s=((st-0.70)/0.30)*fy*0.6; wr-=(s*38)|0; wg-=(s*32)|0; wb-=(s*22)|0;}
+                t[i]=clamp(wr); t[i+1]=clamp(wg); t[i+2]=clamp(wb); t[i+3]=255;
             }
 
-            // Coulures d'eau (stries verticales sombres)
-            const stain = smooth(x + 200, 0, 20);
-            if (stain > 0.70) {
-                const str = ((stain - 0.70) / 0.30) * fy * 0.6;
-                wr -= (str * 38) | 0;
-                wg -= (str * 32) | 0;
-                wb -= (str * 22) | 0;
+            // ── TYPE 2 : vieille brique rouge + mousse (immeuble B) ──────────
+            {
+                const t = wallTex[2];
+                const bH=13, bW=32;
+                const row=(y/bH)|0, off=(row%2)*(bW>>1);
+                const bx=((x+off)%bW)/bW, by=(y%bH)/bH;
+                let wr, wg, wb;
+                if (bx<0.07||by<0.14) { wr=78; wg=74; wb=70; }   // mortier
+                else {
+                    const bID=row*8+(((x+off)/bW)|0), bN=rng(bID,7);
+                    wr=(118+bN*28)|0; wg=(60+bN*18)|0; wb=(46+bN*14)|0;
+                    const sv=smooth(x,y,7);
+                    wr+=((sv-0.5)*16)|0; wg+=((sv-0.5)*10)|0; wb+=((sv-0.5)*8)|0;
+                }
+                const mBot=Math.pow(Math.max(0,(fy-0.65)*3),2)*0.7;
+                const mN=smooth(x,y,22)*(0.28+mBot);
+                if (mN>0.52){const bl=Math.min(1,(mN-0.52)/0.22); wr=((wr*(1-bl))+40*bl)|0; wg=((wg*(1-bl))+95*bl)|0; wb=((wb*(1-bl))+28*bl)|0;}
+                const gr=fbm(x+300,y+200); wr-=(gr*0.4*15)|0; wg-=(gr*0.4*12)|0;
+                t[i]=clamp(wr); t[i+1]=clamp(wg); t[i+2]=clamp(wb); t[i+3]=255;
             }
 
-            wallTex[i]   = Math.max(0, Math.min(255, wr));
-            wallTex[i+1] = Math.max(0, Math.min(255, wg));
-            wallTex[i+2] = Math.max(0, Math.min(255, wb));
-            wallTex[i+3] = 255;
-
-            // ── SOL : béton fissuré avec herbes folles ────────────────────────
-            let fr = 52, fg = 56, fb = 47;
-
-            const fv = fbm(x + 300, y + 700);
-            fr += ((fv - 0.5) * 20) | 0;
-            fg += ((fv - 0.5) * 18) | 0;
-            fb += ((fv - 0.5) * 14) | 0;
-
-            // Fissures
-            if (fbm(x * 2.1, y * 1.9) < 0.22) { fr -= 22; fg -= 22; fb -= 18; }
-
-            // Herbes / mauvaises herbes
-            const gn = fbm(x + 100, y + 400);
-            if (gn > 0.60) {
-                const bl = Math.min(1, (gn - 0.60) / 0.25);
-                fr = ((fr * (1 - bl)) + 33 * bl + 0.5) | 0;
-                fg = ((fg * (1 - bl)) + 92 * bl + 0.5) | 0;
-                fb = ((fb * (1 - bl)) + 20 * bl + 0.5) | 0;
+            // ── TYPE 3 : métal rouillé industriel ────────────────────────────
+            {
+                const t = wallTex[3];
+                const corr=Math.sin((y%12)/12*Math.PI*2)*0.5+0.5;
+                let wr=(70+corr*16)|0, wg=(64+corr*13)|0, wb=(60+corr*10)|0;
+                if (x%32<3) { wr-=22; wg-=20; wb-=16; }   // joints verticaux
+                const rust=smooth(x*1.4,y*0.9,20);
+                if (rust>0.58){const bl=Math.min(1,(rust-0.58)/0.28); wr=((wr*(1-bl))+145*bl+0.5)|0; wg=((wg*(1-bl))+60*bl+0.5)|0; wb=((wb*(1-bl))+25*bl+0.5)|0;}
+                // Rivets aux angles de panneaux
+                const px32=x%32, py32=y%32, cx=px32<16?2:30, cy=py32<16?2:30;
+                if ((px32<5||px32>27)&&(py32<5||py32>27)&&(px32-cx)**2+(py32-cy)**2<5) {wr=130; wg=125; wb=120;}
+                const sk=smooth(x+50,0,14);
+                if (sk>0.74){const s=((sk-0.74)/0.26)*fy*0.45; wr-=(s*28)|0; wg-=(s*22)|0; wb-=(s*18)|0;}
+                const mBot=Math.pow(Math.max(0,(fy-0.82)*5),2)*0.5*smooth(x,y,18);
+                if (mBot>0.28){const bl=Math.min(1,(mBot-0.28)/0.18); wr=((wr*(1-bl))+38*bl)|0; wg=((wg*(1-bl))+88*bl)|0; wb=((wb*(1-bl))+22*bl)|0;}
+                t[i]=clamp(wr); t[i+1]=clamp(wg); t[i+2]=clamp(wb); t[i+3]=255;
             }
 
-            // Petites flaques
-            const pn = smooth(x, y, 38);
-            if (pn > 0.75) {
-                const bl = Math.min(1, (pn - 0.75) / 0.22);
-                fr = ((fr * (1 - bl)) + 33 * bl + 0.5) | 0;
-                fg = ((fg * (1 - bl)) + 42 * bl + 0.5) | 0;
-                fb = ((fb * (1 - bl)) + 60 * bl + 0.5) | 0;
+            // ── SOL : béton fissuré avec herbes et flaques ───────────────────
+            {
+                const t = floorTex;
+                let fr=52, fg=56, fb=47;
+                const fv=fbm(x+300,y+700);
+                fr+=((fv-0.5)*20)|0; fg+=((fv-0.5)*18)|0; fb+=((fv-0.5)*14)|0;
+                if (fbm(x*2.1,y*1.9)<0.22) { fr-=22; fg-=22; fb-=18; }
+                const gn=fbm(x+100,y+400);
+                if (gn>0.60){const bl=Math.min(1,(gn-0.60)/0.25); fr=((fr*(1-bl))+33*bl+0.5)|0; fg=((fg*(1-bl))+92*bl+0.5)|0; fb=((fb*(1-bl))+20*bl+0.5)|0;}
+                const pn=smooth(x,y,38);
+                if (pn>0.75){const bl=Math.min(1,(pn-0.75)/0.22); fr=((fr*(1-bl))+33*bl+0.5)|0; fg=((fg*(1-bl))+42*bl+0.5)|0; fb=((fb*(1-bl))+60*bl+0.5)|0;}
+                t[i]=clamp(fr); t[i+1]=clamp(fg); t[i+2]=clamp(fb); t[i+3]=255;
             }
-
-            floorTex[i]   = Math.max(0, Math.min(255, fr));
-            floorTex[i+1] = Math.max(0, Math.min(255, fg));
-            floorTex[i+2] = Math.max(0, Math.min(255, fb));
-            floorTex[i+3] = 255;
         }
     }
 })();
@@ -170,7 +198,9 @@ const player = {
     angle: 0,
     speed: 2.5,
     fov: Math.PI / 3,
-    viewDistance: TILE_SIZE * 10,
+    viewDistance: TILE_SIZE * 14,
+    height: 0,        // hauteur caméra lissée (0 = RDC, 4 = 1 étage)
+    heightTarget: 0,  // hauteur cible depuis FLOOR_H
 };
 
 // ─── WEAPON ──────────────────────────────────────────────────────────────────
@@ -223,7 +253,7 @@ function isWall(x, y) {
     const tx = Math.floor(x / TILE_SIZE);
     const ty = Math.floor(y / TILE_SIZE);
     if (tx < 0 || tx >= MAP_W || ty < 0 || ty >= MAP_H) return true;
-    return MAP[ty][tx] === 1;
+    return MAP[ty][tx] !== 0; // tout tile non-nul est un mur
 }
 
 function canMove(x, y) {
@@ -261,22 +291,24 @@ class Enemy {
 // ─── RAYCASTING ──────────────────────────────────────────────────────────────
 function castRays() {
     const W = canvas.width, H = canvas.height;
-    const halfH = H >> 1;
+
+    // Hauteur caméra : monte quand le joueur est sur un palier élevé
+    const camOff  = (player.height * H * 0.045) | 0;
+    const cameraY = (H >> 1) - camOff;   // ligne d'horizon (monte = plus d'étage visible)
 
     // Smooth ADS zoom
     const targetFOV = game.aiming ? game.baseFOV * 0.4 : game.baseFOV;
     player.fov += (targetFOV - player.fov) * 0.12;
 
-    // Réutiliser le buffer d'image (évite l'allocation chaque frame)
     if (!_frameData || _frameData.width !== W || _frameData.height !== H) {
         _frameData = ctx.createImageData(W, H);
     }
     const data = _frameData.data;
 
-    // ── CIEL : dramatique, ciel couvert d'immeuble abandonné ─────────────────
-    for (let y = 0; y < halfH; y++) {
-        const t = y / halfH;
-        const r = (52  + 108 * t) | 0;  // bleu-gris sombre → brume chaude
+    // ── CIEL ─────────────────────────────────────────────────────────────────
+    for (let y = 0; y < cameraY; y++) {
+        const t = y / cameraY;
+        const r = (52  + 108 * t) | 0;
         const g = (68  + 92  * t) | 0;
         const b = (90  + 52  * t) | 0;
         for (let x = 0; x < W; x++) {
@@ -285,16 +317,16 @@ function castRays() {
         }
     }
 
-    // ── SOL TEXTURÉ (floor casting) ───────────────────────────────────────────
+    // ── SOL TEXTURÉ (floor casting, pivoté autour de cameraY) ────────────────
     const posX = player.x / TILE_SIZE, posY = player.y / TILE_SIZE;
     const rDX0 = Math.cos(player.angle - player.fov / 2);
     const rDY0 = Math.sin(player.angle - player.fov / 2);
     const rDX1 = Math.cos(player.angle + player.fov / 2);
     const rDY1 = Math.sin(player.angle + player.fov / 2);
 
-    for (let y = halfH + 1; y < H; y++) {
-        const rowDist = (0.5 * H) / (y - halfH);
-        const fog = Math.max(0, 1 - rowDist * TILE_SIZE / player.viewDistance) * 0.88;
+    for (let y = cameraY + 1; y < H; y++) {
+        const rowDist = (0.5 * H) / (y - cameraY);
+        const fog  = Math.max(0, 1 - rowDist * TILE_SIZE / player.viewDistance) * 0.88;
         const stepX = rowDist * (rDX1 - rDX0) / W;
         const stepY = rowDist * (rDY1 - rDY0) / W;
         let fx = posX + rowDist * rDX0;
@@ -312,7 +344,7 @@ function castRays() {
         }
     }
 
-    // ── MURS TEXTURÉS (DDA raycasting) ───────────────────────────────────────
+    // ── MURS (DDA + texture par type de bâtiment) ────────────────────────────
     zBuffer = new Array(W).fill(Infinity);
 
     for (let col = 0; col < W; col++) {
@@ -336,7 +368,7 @@ function castRays() {
         while (!hit && steps++ < 40) {
             if (sdx < sdy) { sdx += ddx; mx += stepX; side = 0; }
             else           { sdy += ddy; my += stepY; side = 1; }
-            if (mx < 0 || mx >= MAP_W || my < 0 || my >= MAP_H || MAP[my][mx] === 1) hit = true;
+            if (mx < 0 || mx >= MAP_W || my < 0 || my >= MAP_H || MAP[my][mx] !== 0) hit = true;
         }
 
         let dist;
@@ -346,28 +378,33 @@ function castRays() {
 
         zBuffer[col] = dist * TILE_SIZE;
 
-        // Coordonnée U de texture (position horizontale sur la face du mur)
+        // Texture U
         let wallU;
         if (side === 0) wallU = player.y / TILE_SIZE + dist * rdy;
         else            wallU = player.x / TILE_SIZE + dist * rdx;
         wallU -= Math.floor(wallU);
         const texX = Math.min(TEX - 1, (wallU * TEX) | 0);
 
-        const wallH    = Math.min(H * 5, (H / dist) | 0);
-        const drawStart = Math.max(0, (H - wallH) >> 1);
-        const drawEnd   = Math.min(H - 1, (H + wallH) >> 1);
+        // Texture selon le type de bâtiment (1=béton, 2=brique, 3=métal)
+        const wallType = (mx >= 0 && mx < MAP_W && my >= 0 && my < MAP_H) ? MAP[my][mx] : 1;
+        const wTex = wallTex[wallType] || wallTex[1];
+
+        // Mur centré sur cameraY (gère la hauteur caméra)
+        const wallH     = Math.min(H * 5, (H / dist) | 0);
+        const drawStart = Math.max(0, cameraY - (wallH >> 1));
+        const drawEnd   = Math.min(H - 1, cameraY + (wallH >> 1));
 
         const fog = Math.max(0.05, 1 - dist * TILE_SIZE / player.viewDistance);
         const dim = fog * (side === 1 ? 0.60 : 1.0);
 
         for (let row = drawStart; row <= drawEnd; row++) {
-            const wallV = (row - (H - wallH) * 0.5) / wallH;
+            const wallV = (row - (cameraY - wallH * 0.5)) / wallH;
             const texY  = Math.min(TEX - 1, Math.max(0, (wallV * TEX) | 0));
             const ti = (texY * TEX + texX) << 2;
             const i  = (row * W + col) << 2;
-            data[i]   = (wallTex[ti]   * dim) | 0;
-            data[i+1] = (wallTex[ti+1] * dim) | 0;
-            data[i+2] = (wallTex[ti+2] * dim) | 0;
+            data[i]   = (wTex[ti]   * dim) | 0;
+            data[i+1] = (wTex[ti+1] * dim) | 0;
+            data[i+2] = (wTex[ti+2] * dim) | 0;
             data[i+3] = 255;
         }
     }
@@ -555,6 +592,14 @@ function updatePlayer() {
     if (weapon.recoil  > 0) weapon.recoil -= 0.5;
     weapon.bobbing += weapon.bobbingAmount * 0.05;
     weapon.bobbingAmount *= 0.95;
+
+    // Hauteur caméra selon FLOOR_H (escaliers)
+    const flTx = Math.floor(player.x / TILE_SIZE);
+    const flTy = Math.floor(player.y / TILE_SIZE);
+    if (flTx >= 0 && flTx < MAP_W && flTy >= 0 && flTy < MAP_H) {
+        player.heightTarget = FLOOR_H[flTy][flTx];
+    }
+    player.height += (player.heightTarget - player.height) * 0.1;
 }
 
 // ─── DRAW WEAPON ─────────────────────────────────────────────────────────────
