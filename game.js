@@ -35,6 +35,14 @@ enemyImage.src = 'billiard.webp';
 let enemyImageLoaded = false;
 enemyImage.onload = () => { enemyImageLoaded = true; };
 
+const ennemiImage = new Image();
+ennemiImage.src = 'ennemi.avif';
+let ennemiImageLoaded = false;
+// Sprite sheet : 8 colonnes × 2 rangées (marche = rangée 0)
+const ENNEMI_COLS = 8;
+const ENNEMI_ROWS = 2;
+ennemiImage.onload = () => { ennemiImageLoaded = true; };
+
 const weaponImage = new Image();
 weaponImage.src = 'arme1.avif';
 let weaponImageLoaded = false;
@@ -213,6 +221,7 @@ function castRays() {
 function drawEnemies() {
     const W = canvas.width, H = canvas.height;
     const projFactor = (W / 2) / Math.tan(player.fov / 2);
+    const now = Date.now();
 
     // Peintre : plus loin d'abord
     const sorted = [...enemies].sort((a, b) => b.distance - a.distance);
@@ -227,36 +236,73 @@ function drawEnemies() {
         while (relAngle >  Math.PI) relAngle -= 2 * Math.PI;
         while (relAngle < -Math.PI) relAngle += 2 * Math.PI;
 
-        // Hors champ ou derrière
         if (Math.abs(relAngle) > player.fov / 2 + 0.4) continue;
         if (Math.abs(relAngle) >= Math.PI / 2 - 0.05) continue;
 
-        const screenX    = Math.floor(W / 2 + Math.tan(relAngle) * projFactor);
-        const spriteH    = Math.min(H * 3, Math.floor(H * TILE_SIZE / dist));
-        const spriteW    = Math.floor(spriteH * 0.65);
-        const top        = Math.max(0, (H - spriteH) >> 1);
-        const bottom     = Math.min(H - 1, (H + spriteH) >> 1);
-        const left       = screenX - (spriteW >> 1);
-        const right      = left + spriteW;
-        const intensity  = Math.max(0.15, 1 - dist / player.viewDistance);
+        const screenX = Math.floor(W / 2 + Math.tan(relAngle) * projFactor);
+        const spriteH = Math.min(H * 2, Math.floor(H * TILE_SIZE / dist));
 
-        // Tranche par tranche avec vérification zbuffer
-        for (let col = left; col < right; col++) {
-            if (col < 0 || col >= W) continue;
-            if (dist >= zBuffer[col]) continue;
+        // Rapport d'aspect d'une seule frame (1/8 de largeur, 1/2 de hauteur)
+        const frameW  = ennemiImageLoaded ? ennemiImage.naturalWidth  / ENNEMI_COLS : 250;
+        const frameH  = ennemiImageLoaded ? ennemiImage.naturalHeight / ENNEMI_ROWS : 562;
+        const aspect  = frameH > 0 ? frameW / frameH : 0.44;
+        const spriteW = Math.floor(spriteH * aspect);
 
-            const r = Math.floor(230 * intensity);
-            ctx.fillStyle = `rgb(${r},0,0)`;
-            ctx.fillRect(col, top, 1, bottom - top);
-        }
+        // Animation de marche : bobbing vertical + légère oscillation latérale
+        const walkFreq  = 0.004 * (0.7 + e.speed);
+        const walkPhase = now * walkFreq + e.id * 2.37;
+        const bob       = Math.sin(walkPhase)      * Math.max(2, spriteH * 0.04);
+        const sway      = Math.sin(walkPhase * 0.5) * Math.max(1, spriteH * 0.015);
 
-        // Yeux
-        if (spriteH > 20) {
-            const eyeS = Math.max(2, spriteH * 0.09);
-            const eyeY = top + (bottom - top) * 0.28;
-            ctx.fillStyle = `rgba(255,255,0,${intensity})`;
-            ctx.fillRect(screenX - spriteW * 0.22, eyeY, eyeS, eyeS);
-            ctx.fillRect(screenX + spriteW * 0.08, eyeY, eyeS, eyeS);
+        const centerY = H / 2;
+        const top     = Math.floor(centerY - spriteH / 2 + bob);
+        const bottom  = Math.floor(centerY + spriteH / 2 + bob);
+        const left    = Math.floor(screenX - spriteW / 2 + sway);
+        const right   = left + spriteW;
+
+        const startCol = Math.max(0, left);
+        const endCol   = Math.min(W - 1, right - 1);
+        if (startCol > endCol) continue;
+
+        const intensity = Math.max(0.2, 1 - dist / player.viewDistance);
+
+        if (ennemiImageLoaded) {
+            // Masque zbuffer : on regroupe les colonnes visibles en runs contigus
+            ctx.save();
+            ctx.beginPath();
+            let hasVisible = false;
+            let runStart   = -1;
+            for (let col = startCol; col <= endCol + 1; col++) {
+                const vis = col <= endCol && dist < zBuffer[col];
+                if (vis && runStart < 0) {
+                    runStart = col;
+                } else if (!vis && runStart >= 0) {
+                    ctx.rect(runStart, 0, col - runStart, H);
+                    hasVisible = true;
+                    runStart = -1;
+                }
+            }
+            if (hasVisible) {
+                ctx.clip();
+                ctx.globalAlpha = Math.min(1, intensity + 0.25);
+                // Sélection de la frame d'animation (cycle parmi les 8 colonnes, rangée 0 = marche)
+                const animFrame = Math.floor(now / 120) % ENNEMI_COLS;
+                const srcX = animFrame * frameW;
+                const srcY = 0; // rangée 0 = animation de marche
+                ctx.drawImage(ennemiImage,
+                    srcX, srcY, frameW, frameH,     // source : une seule frame
+                    left, top, spriteW, bottom - top // destination
+                );
+                ctx.globalAlpha = 1;
+            }
+            ctx.restore();
+        } else {
+            // Fallback rouge
+            for (let col = startCol; col <= endCol; col++) {
+                if (dist >= zBuffer[col]) continue;
+                ctx.fillStyle = `rgb(${Math.floor(230*intensity)},0,0)`;
+                ctx.fillRect(col, Math.max(0,top), 1, Math.min(H,bottom)-Math.max(0,top));
+            }
         }
     }
 }
