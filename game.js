@@ -48,6 +48,112 @@ weaponImage.src = 'arme1.avif';
 let weaponImageLoaded = false;
 weaponImage.onload = () => { weaponImageLoaded = true; };
 
+// ─── TEXTURES PROCÉDURALES ───────────────────────────────────────────────────
+const TEX = 128;
+const wallTex  = new Uint8ClampedArray(TEX * TEX * 4);
+const floorTex = new Uint8ClampedArray(TEX * TEX * 4);
+
+(function generateTextures() {
+    // Pseudo-random basé sur position
+    function rng(x, y) {
+        const n = Math.sin(x * 127.1 + y * 311.7) * 43758.5453;
+        return n - Math.floor(n);
+    }
+    // Bruit lissé (interpolation cubique)
+    function smooth(x, y, s) {
+        const xi = (x / s) | 0, yi = (y / s) | 0;
+        const xf = x / s - xi, yf = y / s - yi;
+        const ux = xf * xf * (3 - 2 * xf), uy = yf * yf * (3 - 2 * yf);
+        return rng(xi,yi)*(1-ux)*(1-uy) + rng(xi+1,yi)*ux*(1-uy)
+             + rng(xi,yi+1)*(1-ux)*uy   + rng(xi+1,yi+1)*ux*uy;
+    }
+    // FBM multi-échelle
+    function fbm(x, y) {
+        return smooth(x,y,32)*0.50 + smooth(x,y,16)*0.30 + smooth(x,y,8)*0.20;
+    }
+
+    for (let y = 0; y < TEX; y++) {
+        for (let x = 0; x < TEX; x++) {
+            const i  = (y * TEX + x) * 4;
+            const fy = y / TEX; // 0 = haut, 1 = bas
+
+            // ── MUR : béton d'immeuble abandonné ─────────────────────────────
+            let wr = 108, wg = 102, wb = 92; // gris béton chaud
+
+            // Joints de panneaux préfabriqués (2 × 4 panneaux par texture)
+            const jw = TEX >> 1, jh = TEX >> 2;
+            const isJoint = (x % jw < 4) || (y % jh < 4);
+            if (isJoint) { wr -= 30; wg -= 28; wb -= 22; }
+
+            // Variation de surface béton
+            const cv = fbm(x + 500, y + 500);
+            wr += ((cv - 0.5) * 28) | 0;
+            wg += ((cv - 0.5) * 22) | 0;
+            wb += ((cv - 0.5) * 18) | 0;
+
+            // Mousse / végétation : haut (lierre qui retombe) + bas (repousse du sol) + joints
+            const mossTop   = Math.pow(Math.max(0, 1 - fy * 3), 2) * 0.9;
+            const mossBot   = Math.pow(Math.max(0, (fy - 0.55) * 2.5), 2) * 0.95;
+            const mossJoint = isJoint ? 0.28 : 0;
+            const mossN     = fbm(x, y) * (0.42 + mossTop + mossBot + mossJoint);
+            if (mossN > 0.42) {
+                const bl = Math.min(1, (mossN - 0.42) / 0.28);
+                wr = ((wr * (1 - bl)) + 40 * bl + 0.5) | 0;
+                wg = ((wg * (1 - bl)) + 100 * bl + 0.5) | 0;
+                wb = ((wb * (1 - bl)) + 28 * bl + 0.5) | 0;
+            }
+
+            // Coulures d'eau (stries verticales sombres)
+            const stain = smooth(x + 200, 0, 20);
+            if (stain > 0.70) {
+                const str = ((stain - 0.70) / 0.30) * fy * 0.6;
+                wr -= (str * 38) | 0;
+                wg -= (str * 32) | 0;
+                wb -= (str * 22) | 0;
+            }
+
+            wallTex[i]   = Math.max(0, Math.min(255, wr));
+            wallTex[i+1] = Math.max(0, Math.min(255, wg));
+            wallTex[i+2] = Math.max(0, Math.min(255, wb));
+            wallTex[i+3] = 255;
+
+            // ── SOL : béton fissuré avec herbes folles ────────────────────────
+            let fr = 52, fg = 56, fb = 47;
+
+            const fv = fbm(x + 300, y + 700);
+            fr += ((fv - 0.5) * 20) | 0;
+            fg += ((fv - 0.5) * 18) | 0;
+            fb += ((fv - 0.5) * 14) | 0;
+
+            // Fissures
+            if (fbm(x * 2.1, y * 1.9) < 0.22) { fr -= 22; fg -= 22; fb -= 18; }
+
+            // Herbes / mauvaises herbes
+            const gn = fbm(x + 100, y + 400);
+            if (gn > 0.60) {
+                const bl = Math.min(1, (gn - 0.60) / 0.25);
+                fr = ((fr * (1 - bl)) + 33 * bl + 0.5) | 0;
+                fg = ((fg * (1 - bl)) + 92 * bl + 0.5) | 0;
+                fb = ((fb * (1 - bl)) + 20 * bl + 0.5) | 0;
+            }
+
+            // Petites flaques
+            const pn = smooth(x, y, 38);
+            if (pn > 0.75) {
+                const bl = Math.min(1, (pn - 0.75) / 0.22);
+                fr = ((fr * (1 - bl)) + 33 * bl + 0.5) | 0;
+                fg = ((fg * (1 - bl)) + 42 * bl + 0.5) | 0;
+                fb = ((fb * (1 - bl)) + 60 * bl + 0.5) | 0;
+            }
+
+            floorTex[i]   = Math.max(0, Math.min(255, fr));
+            floorTex[i+1] = Math.max(0, Math.min(255, fg));
+            floorTex[i+2] = Math.max(0, Math.min(255, fb));
+            floorTex[i+3] = 255;
+        }
+    }
+})();
+
 // ─── GAME STATE ──────────────────────────────────────────────────────────────
 const game = {
     score: 0, lives: 3, gameOver: false,
@@ -79,6 +185,7 @@ const enemies = [];
 const projectiles = [];
 let nextEnemyId = 0;
 let zBuffer = new Array(canvas.width).fill(Infinity);
+let _frameData = null;
 
 // ─── INPUT ───────────────────────────────────────────────────────────────────
 const keys = {};
@@ -154,26 +261,58 @@ class Enemy {
 // ─── RAYCASTING ──────────────────────────────────────────────────────────────
 function castRays() {
     const W = canvas.width, H = canvas.height;
+    const halfH = H >> 1;
 
-    // Smooth ADS zoom via FOV
+    // Smooth ADS zoom
     const targetFOV = game.aiming ? game.baseFOV * 0.4 : game.baseFOV;
     player.fov += (targetFOV - player.fov) * 0.12;
 
-    // Ciel
-    const skyGrad = ctx.createLinearGradient(0, 0, 0, H / 2);
-    skyGrad.addColorStop(0, '#3a5a8a');
-    skyGrad.addColorStop(1, '#c8a86b');
-    ctx.fillStyle = skyGrad;
-    ctx.fillRect(0, 0, W, H / 2);
+    // Réutiliser le buffer d'image (évite l'allocation chaque frame)
+    if (!_frameData || _frameData.width !== W || _frameData.height !== H) {
+        _frameData = ctx.createImageData(W, H);
+    }
+    const data = _frameData.data;
 
-    // Sol
-    const floorGrad = ctx.createLinearGradient(0, H / 2, 0, H);
-    floorGrad.addColorStop(0, '#b8895a');
-    floorGrad.addColorStop(1, '#6a4c2a');
-    ctx.fillStyle = floorGrad;
-    ctx.fillRect(0, H / 2, W, H / 2);
+    // ── CIEL : dramatique, ciel couvert d'immeuble abandonné ─────────────────
+    for (let y = 0; y < halfH; y++) {
+        const t = y / halfH;
+        const r = (52  + 108 * t) | 0;  // bleu-gris sombre → brume chaude
+        const g = (68  + 92  * t) | 0;
+        const b = (90  + 52  * t) | 0;
+        for (let x = 0; x < W; x++) {
+            const i = (y * W + x) << 2;
+            data[i] = r; data[i+1] = g; data[i+2] = b; data[i+3] = 255;
+        }
+    }
 
-    // Rayons
+    // ── SOL TEXTURÉ (floor casting) ───────────────────────────────────────────
+    const posX = player.x / TILE_SIZE, posY = player.y / TILE_SIZE;
+    const rDX0 = Math.cos(player.angle - player.fov / 2);
+    const rDY0 = Math.sin(player.angle - player.fov / 2);
+    const rDX1 = Math.cos(player.angle + player.fov / 2);
+    const rDY1 = Math.sin(player.angle + player.fov / 2);
+
+    for (let y = halfH + 1; y < H; y++) {
+        const rowDist = (0.5 * H) / (y - halfH);
+        const fog = Math.max(0, 1 - rowDist * TILE_SIZE / player.viewDistance) * 0.88;
+        const stepX = rowDist * (rDX1 - rDX0) / W;
+        const stepY = rowDist * (rDY1 - rDY0) / W;
+        let fx = posX + rowDist * rDX0;
+        let fy = posY + rowDist * rDY0;
+        for (let x = 0; x < W; x++) {
+            const tx = ((Math.floor(fx * TEX) % TEX) + TEX) % TEX;
+            const ty = ((Math.floor(fy * TEX) % TEX) + TEX) % TEX;
+            const ti = (ty * TEX + tx) << 2;
+            const i  = (y * W + x) << 2;
+            data[i]   = (floorTex[ti]   * fog) | 0;
+            data[i+1] = (floorTex[ti+1] * fog) | 0;
+            data[i+2] = (floorTex[ti+2] * fog) | 0;
+            data[i+3] = 255;
+            fx += stepX; fy += stepY;
+        }
+    }
+
+    // ── MURS TEXTURÉS (DDA raycasting) ───────────────────────────────────────
     zBuffer = new Array(W).fill(Infinity);
 
     for (let col = 0; col < W; col++) {
@@ -181,8 +320,8 @@ function castRays() {
         const rdx = Math.cos(rayAngle);
         const rdy = Math.sin(rayAngle);
 
-        let mx = Math.floor(player.x / TILE_SIZE);
-        let my = Math.floor(player.y / TILE_SIZE);
+        let mx = (player.x / TILE_SIZE) | 0;
+        let my = (player.y / TILE_SIZE) | 0;
 
         const ddx = Math.abs(1 / (rdx || 1e-10));
         const ddy = Math.abs(1 / (rdy || 1e-10));
@@ -205,24 +344,35 @@ function castRays() {
         else            dist = (my - player.y / TILE_SIZE + (1 - stepY) / 2) / rdy;
         if (dist < 0.01) dist = 0.01;
 
-        // Stocker distance en pixels pour le zbuffer
         zBuffer[col] = dist * TILE_SIZE;
 
-        // Hauteur de la tranche
-        const wallH = Math.min(H * 5, Math.floor(H / dist));
+        // Coordonnée U de texture (position horizontale sur la face du mur)
+        let wallU;
+        if (side === 0) wallU = player.y / TILE_SIZE + dist * rdy;
+        else            wallU = player.x / TILE_SIZE + dist * rdx;
+        wallU -= Math.floor(wallU);
+        const texX = Math.min(TEX - 1, (wallU * TEX) | 0);
+
+        const wallH    = Math.min(H * 5, (H / dist) | 0);
         const drawStart = Math.max(0, (H - wallH) >> 1);
         const drawEnd   = Math.min(H - 1, (H + wallH) >> 1);
 
-        // Couleur sable avec ombrage
-        const bright = side === 0 ? 1.0 : 0.6;
-        const fog    = Math.max(0.1, 1 - (dist * TILE_SIZE) / player.viewDistance);
-        const r = Math.min(255, Math.floor((170 * fog + 40) * bright));
-        const g = Math.min(255, Math.floor((120 * fog + 20) * bright));
-        const b = Math.min(255, Math.floor(( 60 * fog + 10) * bright));
+        const fog = Math.max(0.05, 1 - dist * TILE_SIZE / player.viewDistance);
+        const dim = fog * (side === 1 ? 0.60 : 1.0);
 
-        ctx.fillStyle = `rgb(${r},${g},${b})`;
-        ctx.fillRect(col, drawStart, 1, drawEnd - drawStart + 1);
+        for (let row = drawStart; row <= drawEnd; row++) {
+            const wallV = (row - (H - wallH) * 0.5) / wallH;
+            const texY  = Math.min(TEX - 1, Math.max(0, (wallV * TEX) | 0));
+            const ti = (texY * TEX + texX) << 2;
+            const i  = (row * W + col) << 2;
+            data[i]   = (wallTex[ti]   * dim) | 0;
+            data[i+1] = (wallTex[ti+1] * dim) | 0;
+            data[i+2] = (wallTex[ti+2] * dim) | 0;
+            data[i+3] = 255;
+        }
     }
+
+    ctx.putImageData(_frameData, 0, 0);
 }
 
 // ─── DRAW ENEMIES ────────────────────────────────────────────────────────────
