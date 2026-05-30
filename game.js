@@ -242,9 +242,10 @@ function drawEnemies() {
         const screenX = Math.floor(W / 2 + Math.tan(relAngle) * projFactor);
         const spriteH = Math.min(H * 2, Math.floor(H * TILE_SIZE / dist));
 
-        // Rapport d'aspect d'une seule frame (1/8 de largeur, 1/2 de hauteur)
-        const frameW  = ennemiImageLoaded ? ennemiImage.naturalWidth  / ENNEMI_COLS : 250;
-        const frameH  = ennemiImageLoaded ? ennemiImage.naturalHeight / ENNEMI_ROWS : 562;
+        // Grand personnage debout : colonnes 6-7 sur toute la hauteur (x=1500, w=500, h=1125)
+        const frameX  = 1500;
+        const frameW  = 500;
+        const frameH  = ennemiImageLoaded ? ennemiImage.naturalHeight : 1125;
         const aspect  = frameH > 0 ? frameW / frameH : 0.44;
         const spriteW = Math.floor(spriteH * aspect);
 
@@ -285,13 +286,10 @@ function drawEnemies() {
             if (hasVisible) {
                 ctx.clip();
                 ctx.globalAlpha = Math.min(1, intensity + 0.25);
-                // Sélection de la frame d'animation (cycle parmi les 8 colonnes, rangée 0 = marche)
-                const animFrame = Math.floor(now / 120) % ENNEMI_COLS;
-                const srcX = animFrame * frameW;
-                const srcY = 0; // rangée 0 = animation de marche
+                // Grand personnage debout (zone droite du sprite sheet)
                 ctx.drawImage(ennemiImage,
-                    srcX, srcY, frameW, frameH,     // source : une seule frame
-                    left, top, spriteW, bottom - top // destination
+                    frameX, 0, frameW, frameH,       // source : grand perso debout
+                    left, top, spriteW, bottom - top  // destination
                 );
                 ctx.globalAlpha = 1;
             }
